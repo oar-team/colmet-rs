@@ -1,5 +1,5 @@
 [package]
-name = "colmet-node-rust"
+name = "colmet-node"
 version = "0.1.0"
 authors = ["lambertrocher <lambert.rocher@gmail.com>"]
 edition = "2018"
