@@ -83,7 +83,7 @@ impl Backend for PerfhwBackend {
 }
 
 fn get_metric_values(cgroup_name: *const u8, metrics_to_get: *const u8, nb_metrics_to_get: usize) -> Vec<i64> {
-    #[link(name = "_perf_hw")]
+    #[link(name = "perf_hw", kind="static")]
     extern {
         fn init_cgroup(cgroup_name: *const u8, metrics: *const u8) -> i32;
     }
