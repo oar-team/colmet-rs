@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate clap;
-extern crate inotify;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -36,7 +35,8 @@ fn main(){
 
     init_logger(cli_args.verbose);
 
-    let cgroup_manager = CgroupManager::new(cli_args.regex_job_id.clone(), cli_args.cgroup_rootpath.clone(), sample_period.clone(), cli_args.sample_period);
+    let cgroup_manager = CgroupManager::new(cli_args.regex_job_id.clone(), cli_args.cgroup_root_path.clone(), cli_args.cgroup_path_suffix.clone(),
+                                            sample_period.clone(), cli_args.sample_period);
 
     let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new()));
 
@@ -81,7 +81,8 @@ pub struct CliArgs {
     zeromq_uri: String,
     zeromq_hwm: i32,
     zeromq_linger: i32,
-    cgroup_rootpath: String,
+    cgroup_root_path: String,
+    cgroup_path_suffix: String,
     regex_job_id: String,
 }
 
@@ -98,7 +99,8 @@ fn parse_cli_args() -> CliArgs {
     let zeromq_uri = value_t!(matches, "zeromq-uri", String).unwrap();
     let zeromq_hwm = value_t!(matches, "zeromq-hwm", i32).unwrap();
     let zeromq_linger = value_t!(matches, "zeromq-linger", i32).unwrap();
-    let cgroup_rootpath = value_t!(matches, "cgroup-rootpath", String).unwrap();
+    let cgroup_root_path = value_t!(matches, "cgroup-root-path", String).unwrap();
+    let cgroup_path_suffix = value_t!(matches, "cgroup-path-suffix", String).unwrap();
     let regex_job_id = value_t!(matches, "regex-job-id", String).unwrap();
 
 
@@ -112,7 +114,8 @@ fn parse_cli_args() -> CliArgs {
         zeromq_uri,
         zeromq_hwm,
         zeromq_linger,
-        cgroup_rootpath,
+        cgroup_root_path,
+        cgroup_path_suffix,
         regex_job_id
     };
     cli_args

@@ -31,7 +31,8 @@ static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
         ("shmem", 4),
         ("mapped_file", 5),
         ("dirty", 6),
-        ("writeback", 7),
+    ("writeback", 7),
+    ("swap", 65),
         ("pgpgin", 8),
         ("pgpgout", 9),
         ("pgfault", 10),
@@ -41,14 +42,16 @@ static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
         ("inactive_file", 14),
         ("active_file", 15),
         ("unevictable", 16),
-        ("hierarchical_memory_limit", 17),
+    ("hierarchical_memory_limit", 17),
+    ("hierarchical_memsw_limit", 66),
         ("total_cache", 18),
         ("total_rss", 19),
         ("total_rss_huge", 20),
         ("total_shmem", 21),
         ("total_mapped_file", 22),
         ("total_dirty", 23),
-        ("total_writeback", 24),
+    ("total_writeback", 24),
+    ("total_swap", 67),
         ("total_pgpgin", 25),
         ("total_pgpgout", 26),
         ("total_pgfault", 27),
@@ -94,11 +97,13 @@ static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
 
 // replace metric names by their id
 pub fn compress_metric_names(metric_names: Vec<String>) -> Vec<i32> {
-        let mut res: Vec<i32> = Vec::new();
-        for metric_name in metric_names {
-            res.push(*METRIC_NAMES_MAP.get(metric_name.as_str()).unwrap());
-        }
-        res
+    println!("compress_metric_names");
+    let mut res: Vec<i32> = Vec::new();
+    for metric_name in metric_names {
+        // println!("compress_metric_names metric_nzme {:#?}", metric_name.as_str().clone());
+        res.push(*METRIC_NAMES_MAP.get(metric_name.as_str()).unwrap());
+    }
+    res
 }
 
 pub trait Backend {

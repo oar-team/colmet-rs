@@ -17,6 +17,8 @@ use regex::Regex;
 
 
 pub struct CgroupManager {
+    pub cgroup_root_path: String, // cgroup root path
+    pub cgroup_path_suffix: String,
     cgroups: Mutex<HashMap<i32, String>>, // cgroup corresponding to user jobs, keys : cgroup id, values : cgroup name
     regex_job_id: String, // regex to find the cpuset directory
     initial_sample_period: f64, // sample period as defined by command line argument at the start of colmet
@@ -24,12 +26,12 @@ pub struct CgroupManager {
 }
 
 impl CgroupManager {
-    pub fn new(regex_job_id: String, cgroup_rootpath: String, current_sample_period: Arc<Mutex<f64>>, initial_sample_period: f64) -> Arc<CgroupManager> {
+    pub fn new(regex_job_id: String, cgroup_root_path: String, cgroup_path_suffix: String, current_sample_period: Arc<Mutex<f64>>, initial_sample_period: f64) -> Arc<CgroupManager> {
         let cgroups = Mutex::new(HashMap::new());
-        let regex_job_id = regex_job_id;
-        let cgroup_rootpath = cgroup_rootpath;
-        let res = Arc::new(CgroupManager { cgroups, regex_job_id, initial_sample_period, current_sample_period });
-        notify_jobs(Arc::clone(&res), cgroup_rootpath.clone());
+        let cgroup_path = format!("{}/cpuset{}", cgroup_root_path.clone(), cgroup_path_suffix.clone());
+        let res = Arc::new(CgroupManager { cgroup_root_path, cgroup_path_suffix, cgroups, regex_job_id,
+                                           initial_sample_period, current_sample_period });
+        notify_jobs(Arc::clone(&res), cgroup_path);
         res
     }
 
@@ -54,10 +56,10 @@ impl CgroupManager {
 }
 
 // scan cpuset directory for changes and update cgroups list
-pub fn notify_jobs(cgroup_manager: Arc<CgroupManager>, cgroup_rootpath: String) {
+pub fn notify_jobs(cgroup_manager: Arc<CgroupManager>, cgroup_path: String) {
     let regex_job_id = Regex::new(&cgroup_manager.regex_job_id).unwrap();
-    println!("{:#?}", cgroup_rootpath);
-    let cgroups = fs::read_dir(cgroup_rootpath.clone()).unwrap();
+    println!("{:#?}", cgroup_path);
+    let cgroups = fs::read_dir(cgroup_path.clone()).unwrap();
     for cgroup in cgroups {
         let path = cgroup.unwrap().path();
         let cgroup_name = path.file_name().unwrap().to_str().unwrap();
@@ -69,7 +71,7 @@ pub fn notify_jobs(cgroup_manager: Arc<CgroupManager>, cgroup_rootpath: String) 
     let mut inotify = Inotify::init()
         .expect("Failed to initialize inotify");
 
-    let current_dir = PathBuf::from(cgroup_rootpath);
+    let current_dir = PathBuf::from(cgroup_path);
 
     inotify
         .add_watch(

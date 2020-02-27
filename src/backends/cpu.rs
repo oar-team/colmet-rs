@@ -24,7 +24,7 @@ impl CpuBackend {
         let backend_name = "Cpu".to_string();
         let metrics = Rc::new(RefCell::new(HashMap::new()));
         for (cgroup_id, cgroup_name) in cgroup_manager.get_cgroups() {
-            let filename = format!("/sys/fs/cgroup/cpu/oar/{}/cpu.stat", cgroup_name);
+            let filename = format!("{}/cpu{}/{}/cpu.stat", cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name);
             let metric_names = get_metric_names(filename);
             let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
             let now = SystemTime::now();
@@ -51,7 +51,8 @@ impl Backend for CpuBackend {
 
     fn get_metrics(& self) -> HashMap<i32, Metric> {
         for (cgroup_id, cgroup_name) in self.cgroup_manager.get_cgroups() {
-            let filename = format!("/sys/fs/cgroup/cpu/oar/{}/cpu.stat", cgroup_name);
+            let filename = format!("{}/cpu{}/{}/cpu.stat", self.cgroup_manager.cgroup_root_path,
+                                   self.cgroup_manager.cgroup_path_suffix, cgroup_name);
             let metric_values = get_metric_values(filename);
             (*self.metrics).borrow_mut().get_mut(&cgroup_id).unwrap().metric_values = Some(metric_values);
         }
