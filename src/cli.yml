@@ -6,7 +6,7 @@ args:
     - verbose:
         short: v
         multiple: true
-        help: Sets the level of verbosity
+        help: Set the level of verbosity
     - sample-period:
         short: s
         long: sample-period
@@ -14,19 +14,19 @@ args:
         default_value: '5'
     - enable-infiniband:
         long: enable-infiniband
-        help: Enables monitoring of infiniband port. Measures are associated to the fictive job with 0 as identifier.
+        help: Enable monitoring of infiniband port. Measures are associated to the fictive job with 0 as identifier.
         default_value: 'false'
     - enable-lustre:
         long: enable-lustre
-        help: Enables monitoring mounting lustre fs. Measures are associated to the fictive job with 0 as identifier.
+        help: Enable monitoring mounting lustre fs. Measures are associated to the fictive job with 0 as identifier.
         default_value: 'false'
     - enable-perfhw:
         long: enable-perfhw
-        help: Enables monitoring of jobs from the performance API.
+        help: Enable monitoring of jobs from the performance API.
         default_value: 'false'
     - enable-RAPL:
         long: enable-RAPL
-        help: Enables monitoring using Running Average Power Limit (RAPL). Measures are associated to the fictive job with 0 as identifier.
+        help: Enable monitoring using Running Average Power Limit (RAPL). Measures are associated to the fictive job with 0 as identifier.
         default_value: 'false'
     - zeromq-uri:
         long: zeromq-uri
@@ -48,8 +48,12 @@ args:
         long: cgroup-path-suffix
         help: cgroup root suffix
         default_value: '/oar'
+    - wait-cgroup-cpuset-path:
+        long: wait-cgroup-cpuset-path
+        help: Wait creation of the cgroup-cpuset path
+        default_value: 'true'
     - regex-job-id:
           long: regex-job-id
-          help: Regular expression to extract job_id from cpuset directory name.
+          help: Set regular expression to extract job_id from cpuset directory name.
           default_value: '_(\d+)$'
 

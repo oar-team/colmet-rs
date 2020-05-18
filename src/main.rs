@@ -13,6 +13,14 @@ use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::path::Path;
+use std::path::PathBuf;
+
+use inotify::{
+    EventMask,
+    Inotify,
+    WatchMask,
+};
 
 // command line argument parser
 use clap::App;
@@ -35,12 +43,27 @@ fn main(){
 
     init_logger(cli_args.verbose);
 
-    let cgroup_manager = CgroupManager::new(cli_args.regex_job_id.clone(), cli_args.cgroup_root_path.clone(), cli_args.cgroup_path_suffix.clone(),
+    let cgroup_cpuset_path = format!("{}/cpuset{}", cli_args.cgroup_root_path.clone(),
+                                      cli_args.cgroup_path_suffix.clone());
+    
+    if !Path::new(&cgroup_cpuset_path).exists() {
+        debug!("cgroup_cpuset_path does not exist {}", cgroup_cpuset_path);
+        if cli_args.wait_cgroup_cpuset_path {
+            error!("cgroup_cpuset_path does not exist {}", cgroup_cpuset_path);
+            std::process::exit(1);
+        //} else {
+        }
+    }
+        
+    
+    let cgroup_manager = CgroupManager::new(cli_args.regex_job_id.clone(),
+                                            cli_args.cgroup_root_path.clone(),
+                                            cli_args.cgroup_path_suffix.clone(),
                                             sample_period.clone(), cli_args.sample_period);
 
     let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new()));
 
-    let  bm = (*backends_manager_ref).borrow();
+    let bm = (*backends_manager_ref).borrow();
     let backends = bm.init_backends(cli_args.clone(), cgroup_manager.clone());
 
     let b_backends = &(*backends).borrow();
@@ -83,6 +106,7 @@ pub struct CliArgs {
     zeromq_linger: i32,
     cgroup_root_path: String,
     cgroup_path_suffix: String,
+    wait_cgroup_cpuset_path: bool,
     regex_job_id: String,
 }
 
@@ -101,6 +125,7 @@ fn parse_cli_args() -> CliArgs {
     let zeromq_linger = value_t!(matches, "zeromq-linger", i32).unwrap();
     let cgroup_root_path = value_t!(matches, "cgroup-root-path", String).unwrap();
     let cgroup_path_suffix = value_t!(matches, "cgroup-path-suffix", String).unwrap();
+    let wait_cgroup_cpuset_path = value_t!(matches, "wait-cgroup-cpuset-path", bool).unwrap();
     let regex_job_id = value_t!(matches, "regex-job-id", String).unwrap();
 
 
@@ -116,6 +141,7 @@ fn parse_cli_args() -> CliArgs {
         zeromq_linger,
         cgroup_root_path,
         cgroup_path_suffix,
+        wait_cgroup_cpuset_path,
         regex_job_id
     };
     cli_args
