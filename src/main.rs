@@ -48,14 +48,47 @@ fn main(){
     
     if !Path::new(&cgroup_cpuset_path).exists() {
         debug!("cgroup_cpuset_path does not exist {}", cgroup_cpuset_path);
-        if cli_args.wait_cgroup_cpuset_path {
+        if !cli_args.wait_cgroup_cpuset_path {
             error!("cgroup_cpuset_path does not exist {}", cgroup_cpuset_path);
             std::process::exit(1);
-        //} else {
+        } else {
+            let mut inotify = Inotify::init()
+                .expect("Failed to initialize inotify");
+            let split_path = cgroup_cpuset_path.split("/");
+            let mut path = PathBuf::from("/");
+            let mut flag = false;
+
+            debug!("Waiting cgroup_cpuset_path's creation {}: ", cgroup_cpuset_path);
+            // Can be a recursive process
+            for next in split_path {
+                let dir = path.clone();    
+                path.push(next);
+                
+                if !Path::new(&path).exists() {
+                    inotify.add_watch(dir, WatchMask::CREATE,)
+                        .expect("Failed to add inotify watch");
+                    let mut buffer = [0u8; 4096];
+                    while !Path::new(&path).exists() {
+                        let events = inotify
+                            .read_events_blocking(&mut buffer)
+                            .expect("Failed to read inotify events");
+                        for event in events {
+                            if event.mask.contains(EventMask::ISDIR) {
+                                debug!("Directory created: {:?}", event.name);
+                                if Path::new(&cgroup_cpuset_path).exists() {
+                                    flag = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                if flag { break; }
+            }
+            inotify.close().expect("Failed to close inotify instance");
         }
     }
-        
-    
+
+    // TODO, replace cgroup_root_path cgroup_path_suffix by cgroup_cpuset_path ?
     let cgroup_manager = CgroupManager::new(cli_args.regex_job_id.clone(),
                                             cli_args.cgroup_root_path.clone(),
                                             cli_args.cgroup_path_suffix.clone(),
