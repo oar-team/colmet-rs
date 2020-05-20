@@ -10,6 +10,9 @@ use crate::CliArgs;
 use std::time::SystemTime;
 use crate::backends::perfhw::PerfhwBackend;
 
+extern crate yaml_rust;
+use yaml_rust::YamlLoader;
+
 pub(crate) mod metric;
 
 mod memory;
@@ -22,17 +25,43 @@ use std::rc::Rc;
 
 // start backends and periodically fetch all of them to get the metrics
 
+
+fn load_metrics_from_yaml() -> yaml_rust::Yaml {
+    YamlLoader::load_from_str(include_str!("metrics_order.yml"))
+        .expect("failed to load YAML file")
+        .pop()
+        .unwrap()
+}
+
 // used to send more little messages on the network, metric names are replaced by an id, this list must be the same in colmet-collector
+lazy_static! { 
+    static ref METRIC_NAMES_MAP: HashMap< String, i32> = {
+        let mut m = HashMap::new();
+        let doc = load_metrics_from_yaml();
+        let mut i = 0;
+        for metric in doc["metrics_order"].as_vec().unwrap() {
+            m.insert(metric.as_str().unwrap().to_string(), i);
+            // println!("{:?}: {}", metric.as_str().unwrap(), i);
+            i += 1;
+        }
+        m
+    };
+    static ref METRICS_VERSION: i64 = load_metrics_from_yaml()["meta"]["version"].as_i64().unwrap() ;
+    static ref NB_METRICS: usize = METRIC_NAMES_MAP.len();
+
+}
+
+/*
 lazy_static! {
-static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
+    static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
         ("cache", 1), // Memory Backend
         ("rss", 2),
         ("rss_huge", 3),
         ("shmem", 4),
         ("mapped_file", 5),
         ("dirty", 6),
-    ("writeback", 7),
-    ("swap", 65),
+        ("writeback", 7),
+        ("swap", 65),
         ("pgpgin", 8),
         ("pgpgout", 9),
         ("pgfault", 10),
@@ -42,16 +71,16 @@ static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
         ("inactive_file", 14),
         ("active_file", 15),
         ("unevictable", 16),
-    ("hierarchical_memory_limit", 17),
-    ("hierarchical_memsw_limit", 66),
+        ("hierarchical_memory_limit", 17),
+        ("hierarchical_memsw_limit", 66),
         ("total_cache", 18),
         ("total_rss", 19),
         ("total_rss_huge", 20),
         ("total_shmem", 21),
         ("total_mapped_file", 22),
         ("total_dirty", 23),
-    ("total_writeback", 24),
-    ("total_swap", 67),
+        ("total_writeback", 24),
+        ("total_swap", 67),
         ("total_pgpgin", 25),
         ("total_pgpgout", 26),
         ("total_pgfault", 27),
@@ -92,8 +121,9 @@ static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
         ("emulation_faults", 62),
         ("dummy", 63),
         ("bpf_output", 64),
-        ].into_iter().collect();
+    ].into_iter().collect();
 }
+ */
 
 // replace metric names by their id
 pub fn compress_metric_names(metric_names: Vec<String>) -> Vec<i32> {
@@ -167,7 +197,6 @@ impl BackendsManager {
                     Some(tmp) => {
                         let (_hostname, _timestamp, m) = tmp;
                         m.push((metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap()));
-
                     },
                     None => {
                         metrics.insert(job_id, (metric.hostname, timestamp, vec![(metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap() )]));

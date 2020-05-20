@@ -18,7 +18,7 @@ futures = "0.1.28"
 tempdir = "0.3.7"
 regex = "1.2.0"
 gethostname = "0.2.0"
-
+yaml-rust = "0.4.1"
 lazy_static = "1.4.0"
 rmp = "^0.8"
 rmp-serialize = "0.8.0"
