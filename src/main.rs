@@ -103,12 +103,15 @@ fn main(){
     let zmq_sender = zeromq::ZmqSender::init(b_backends);
     zmq_sender.open(&cli_args.zeromq_uri, cli_args.zeromq_linger, cli_args.zeromq_hwm);
 
+    let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
+    
     // main loop that pull backends measurements periodically ans send them with zeromq
     loop {
         let now = SystemTime::now();
-        println!("{:#?}", now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis());
+        let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
+        println!("{:#?}", timestamp);
 
-        let metric = bm.get_all_metrics();
+        let metric = bm.get_all_metrics(timestamp, hostname.clone());
         debug!("time to take measures {} microseconds", now.elapsed().unwrap().as_micros());
         zmq_sender.send_metrics(metric);
         zmq_sender.receive_config(sample_period.clone());

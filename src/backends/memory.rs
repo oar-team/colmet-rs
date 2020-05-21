@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
-use std::time::SystemTime;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -25,10 +24,7 @@ impl MemoryBackend {
         for (cgroup_id, cgroup_name) in cgroup_manager.get_cgroups() {
             let filename = format!("{}/memory{}/{}/memory.stat", cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name);
             let metric_names = get_metric_names(filename);
-            let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
-            let now = SystemTime::now();
-            let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i32;
-            let metric = Metric { job_id: cgroup_id, hostname, timestamp, backend_name: backend_name.clone(), metric_names, metric_values: None };
+            let metric = Metric { job_id: cgroup_id, backend_name: backend_name.clone(), metric_names, metric_values: None };
             (*metrics).borrow_mut().insert(cgroup_id, metric);
         }
         MemoryBackend { backend_name, cgroup_manager, metrics }

@@ -7,7 +7,7 @@ use crate::backends::cpu::CpuBackend;
 use crate::backends::metric::Metric;
 use crate::cgroup_manager::CgroupManager;
 use crate::CliArgs;
-use std::time::SystemTime;
+
 use crate::backends::perfhw::PerfhwBackend;
 
 extern crate yaml_rust;
@@ -185,8 +185,7 @@ impl BackendsManager {
     }
 
 
-    pub fn get_all_metrics(& self) -> HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)> {
-        let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
+    pub fn get_all_metrics(& self, timestamp: i64, hostname: String) -> HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)> {
         let version = *METRICS_VERSION;
         let mut metrics: HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>= HashMap::new();
 
@@ -200,7 +199,7 @@ impl BackendsManager {
                         m.push((metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap()));
                     },
                     None => {
-                        metrics.insert(job_id, (metric.hostname, timestamp, version, vec![(metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap() )]));
+                        metrics.insert(job_id, (hostname.clone(), timestamp, version, vec![(metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap() )]));
                     },
                 }
             }

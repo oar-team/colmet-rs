@@ -2,7 +2,6 @@ extern crate gethostname;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
@@ -32,10 +31,7 @@ impl PerfhwBackend {
 
         for (cgroup_id, _cgroup_name) in cgroup_manager.get_cgroups() {
             let metric_names = (*metrics_to_get).borrow().clone();
-            let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
-            let now = SystemTime::now();
-            let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i32;
-            let metric = Metric { job_id: cgroup_id, hostname, timestamp, backend_name: backend_name.clone(), metric_names, metric_values: None };
+            let metric = Metric { job_id: cgroup_id, backend_name: backend_name.clone(), metric_names, metric_values: None };
             (*metrics).borrow_mut().insert(cgroup_id, metric);
         }
         PerfhwBackend { backend_name, cgroup_manager, metrics, metrics_to_get }
@@ -72,10 +68,7 @@ impl Backend for PerfhwBackend {
         let mut metrics = HashMap::new();
          for (cgroup_id, _cgroup_name) in self.cgroup_manager.get_cgroups() {
              let metric_names = metrics_to_get.clone();
-             let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
-             let now = SystemTime::now();
-             let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i32;
-             let metric = Metric { job_id: cgroup_id, hostname, timestamp, backend_name: self.backend_name.clone(), metric_names, metric_values: None };
+             let metric = Metric { job_id: cgroup_id, backend_name: self.backend_name.clone(), metric_names, metric_values: None };
              metrics.insert(cgroup_id, metric);
          }
         *(*self.metrics).borrow_mut() = metrics;
