@@ -51,7 +51,7 @@ lazy_static! {
 
 }
 
-/*
+/* TOREMOVE
 lazy_static! {
     static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
         ("cache", 1), // Memory Backend
@@ -185,9 +185,10 @@ impl BackendsManager {
     }
 
 
-    pub fn get_all_metrics(& self) -> HashMap<i32, (String, i64, Vec<(String, Vec<i32>, Vec<i64>)>)> {
+    pub fn get_all_metrics(& self) -> HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)> {
         let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
-        let mut metrics: HashMap<i32, (String, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>= HashMap::new();
+        let version = *METRICS_VERSION;
+        let mut metrics: HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>= HashMap::new();
 
         let b = (*self.backends).borrow();
         let bi = b.iter();
@@ -195,11 +196,11 @@ impl BackendsManager {
             for (job_id, metric) in backend.get_metrics() {
                 match metrics.get_mut(&job_id) {
                     Some(tmp) => {
-                        let (_hostname, _timestamp, m) = tmp;
+                        let (_hostname, _timestamp, _version, m) = tmp;
                         m.push((metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap()));
                     },
                     None => {
-                        metrics.insert(job_id, (metric.hostname, timestamp, vec![(metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap() )]));
+                        metrics.insert(job_id, (metric.hostname, timestamp, version, vec![(metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap() )]));
                     },
                 }
             }

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use rmps::{Deserializer, Serializer};
 use self::zmq::Message;
 use std::sync::{Arc, Mutex};
-use crate::backends::{Backend};
+use crate::backends::Backend;
 
 pub struct ZmqSender<'a> {
     sender: zmq::Socket, // sends counters to colmet-collector
@@ -37,14 +37,14 @@ impl ZmqSender<'_> {
 
     }
 
-    pub fn send_metrics(&self, metrics: HashMap<i32, (String, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>) {
+    pub fn send_metrics(&self, metrics: HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>) {
         let mut buf = Vec::new();
         match metrics.serialize(&mut Serializer::new(&mut buf)){
             Err(e) => println!("{}", e),
             Ok(_t) => ()
         }
-//        let mut de = Deserializer::new(&buf[..]);
-//        let res: HashMap<i32, (String, i64, Vec<(String, Vec<i32>, Vec<i64>)>)> = Deserialize::deserialize(&mut de).unwrap();
+        //        let mut de = Deserializer::new(&buf[..]);
+        //        let res: HashMap<i32, (String, i64, Vec<(String, Vec<i32>, Vec<i64>)>)> = Deserialize::deserialize(&mut de).unwrap();
         self.sender.send(buf, 0).unwrap();
     }
 
