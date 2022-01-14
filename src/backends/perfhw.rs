@@ -51,13 +51,30 @@ impl Backend for PerfhwBackend {
 
     fn close(&self) {}
 
-    fn get_metrics(& self) ->HashMap<i32, Metric> {
-        for (cgroup_id, cgroup_name) in self.cgroup_manager.get_cgroups() {
+    fn get_metrics(&self) -> HashMap<i32, Metric> {
+        let cgroups = self.cgroup_manager.get_cgroups();
+        debug!("cgroup: {:#?}", cgroups);
+
+        for (cgroup_id, cgroup_name) in cgroups {
+            debug!(
+                "Getting cgroup name:= {}, with id:={}",
+                cgroup_name, cgroup_id
+            );
             let cgroup_name_string = format!("/oar/{}{}", cgroup_name, "\0").to_string();
             let cgroup_name = cgroup_name_string.as_ptr();
 
-            let metric_values = get_metric_values(cgroup_name, format!("{}{}", (*self.metrics_to_get).borrow().join(","), "\0").as_ptr(), (*self.metrics_to_get).borrow().len()); // https://doc.rust-lang.org/std/ffi/struct.CString.html this type seems more appropriate but I cant get it to work
-            (*self.metrics).borrow_mut().get_mut(&cgroup_id).unwrap().metric_values = Some(metric_values);
+            let metric_names = format!("{}{}", (*self.metrics_to_get).borrow().join(","), "\0");
+            debug!("Getting mettrics: {}", metric_names);
+            let metric_values = get_metric_values(
+                cgroup_name,
+                metric_names.as_ptr(),
+                (*self.metrics_to_get).borrow().len(),
+            ); // https://doc.rust-lang.org/std/ffi/struct.CString.html this type seems more appropriate but I cant get it to work
+            (*self.metrics)
+                .borrow_mut()
+                .get_mut(&cgroup_id)
+                .unwrap()
+                .metric_values = Some(metric_values);
         }
         println!("new metric {:#?}", self.metrics.clone());
         (*self.metrics).borrow_mut().clone()
@@ -66,11 +83,16 @@ impl Backend for PerfhwBackend {
     fn set_metrics_to_get(& self, metrics_to_get: Vec<String>){
         *(*self.metrics_to_get).borrow_mut() = metrics_to_get.clone();
         let mut metrics = HashMap::new();
-         for (cgroup_id, _cgroup_name) in self.cgroup_manager.get_cgroups() {
-             let metric_names = metrics_to_get.clone();
-             let metric = Metric { job_id: cgroup_id, backend_name: self.backend_name.clone(), metric_names, metric_values: None };
-             metrics.insert(cgroup_id, metric);
-         }
+        for (cgroup_id, _cgroup_name) in self.cgroup_manager.get_cgroups() {
+            let metric_names = metrics_to_get.clone();
+            let metric = Metric {
+                job_id: cgroup_id,
+                backend_name: self.backend_name.clone(),
+                metric_names,
+                metric_values: None,
+            };
+            metrics.insert(cgroup_id, metric);
+        }
         *(*self.metrics).borrow_mut() = metrics;
     }
 }
@@ -81,7 +103,7 @@ fn get_metric_values(cgroup_name: *const u8, metrics_to_get: *const u8, nb_metri
         fn init_cgroup(cgroup_name: *const u8, metrics: *const u8) -> i32;
     }
 
-    extern {
+    extern "C" {
         fn get_counters(values: *mut i64, cgroup_name: *const u8) -> i32;
     }
 

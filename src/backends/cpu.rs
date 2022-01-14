@@ -45,12 +45,36 @@ impl Backend for CpuBackend {
         return self.backend_name.clone();
     }
 
-    fn get_metrics(& self) -> HashMap<i32, Metric> {
-        for (cgroup_id, cgroup_name) in self.cgroup_manager.get_cgroups() {
-            let filename = format!("{}/cpu{}/{}/cpu.stat", self.cgroup_manager.cgroup_root_path,
-                                   self.cgroup_manager.cgroup_path_suffix, cgroup_name);
-            let metric_values = get_metric_values(filename);
-            (*self.metrics).borrow_mut().get_mut(&cgroup_id).unwrap().metric_values = Some(metric_values);
+    fn get_metrics(&self) -> HashMap<i32, Metric> {
+        let cgroups = self.cgroup_manager.get_cgroups();
+        debug!("cgroup: {:#?}", cgroups);
+
+        for (cgroup_id, cgroup_name) in cgroups {
+            let filename = format!(
+                "{}/cpu{}/{}/cpu.stat",
+                self.cgroup_manager.cgroup_root_path,
+                self.cgroup_manager.cgroup_path_suffix,
+                cgroup_name
+            );
+
+            wait_file(&filename, true);
+            debug!("metrics: {:#?}", self.metrics);
+
+            let metric_values = get_metric_values(&filename);
+
+            let mut borrowed_metrics = self.metrics.borrow_mut();
+            if (borrowed_metrics.contains_key(&cgroup_id)) {
+                borrowed_metrics.get_mut(&cgroup_id).unwrap().metric_values = Some(metric_values);
+            } else {
+                let metric_names = get_metric_names(&filename);
+                let metric = Metric {
+                    job_id: cgroup_id,
+                    backend_name: self.backend_name.clone(),
+                    metric_names,
+                    metric_values: Some(metric_values),
+                };
+                borrowed_metrics.insert(cgroup_id, metric);
+            }
         }
 //        println!("new metric {:#?}", self.metrics.clone());
         (*self.metrics).borrow_mut().clone()

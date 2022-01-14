@@ -37,7 +37,9 @@ impl CgroupManager {
 
     pub fn add_cgroup(&self, id: i32, name: String) {
         let mut map = self.cgroups.lock().unwrap();
-        map.borrow_mut().insert(id, name);
+        let mapmut = map.borrow_mut();
+        mapmut.insert(id, name);
+        debug!("cgroups after insertion: {:#?}", map);
     }
 
     pub fn remove_cgroup(&self, id: i32) {
@@ -84,26 +86,35 @@ pub fn notify_jobs(cgroup_manager: Arc<CgroupManager>, cgroup_path: String) {
 
     let mut buffer = [0u8; 4096];
 
-    let _child = thread::spawn(move || {
-        loop {
-            let events = inotify
-                .read_events_blocking(&mut buffer)
-                .expect("Failed to read inotify events");
+    let _child = thread::spawn(move || loop {
+        let events = inotify
+            .read_events_blocking(&mut buffer)
+            .expect("Failed to read inotify events");
 
-            for event in events {
-                cgroup_manager.print_cgroups();
+        for event in events {
+            cgroup_manager.print_cgroups();
 
-                if event.mask.contains(EventMask::ISDIR) {
-                    let cgroup_name = event.name.unwrap().to_str().unwrap();
+            if event.mask.contains(EventMask::ISDIR) {
+                let cgroup_name = event.name.unwrap().to_str().unwrap();
 
-                    if event.mask.contains(EventMask::CREATE) {
-                        if let Some(v) = regex_job_id.find(cgroup_name) {
-                            cgroup_manager.add_cgroup(*(&cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap()), cgroup_name.to_string())
-                        }
-                    } else if event.mask.contains(EventMask::DELETE) && regex_job_id.is_match(cgroup_name) {
-                        if let Some(v) = regex_job_id.find(cgroup_name) {
-                            cgroup_manager.remove_cgroup(*(&cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap()));
-                        }
+                if event.mask.contains(EventMask::CREATE) {
+                    debug!("CREATE event!");
+                    if let Some(v) = regex_job_id.find(cgroup_name) {
+                        debug!("Add cgroup: {}", cgroup_name);
+                        cgroup_manager.add_cgroup(
+                            *(&cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap()),
+                            cgroup_name.to_string(),
+                        )
+                    } else {
+                        debug!("Nooop");
+                    }
+                } else if event.mask.contains(EventMask::DELETE)
+                    && regex_job_id.is_match(cgroup_name)
+                {
+                    if let Some(v) = regex_job_id.find(cgroup_name) {
+                        cgroup_manager.remove_cgroup(
+                            *(&cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap()),
+                        );
                     }
                 }
             }
