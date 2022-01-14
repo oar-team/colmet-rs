@@ -5,11 +5,13 @@ use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
 
+use crate::backends::metric::Metric;
 use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
-use crate::backends::metric::Metric;
 
+use crate::utils::wait_file;
 use std::cell::RefCell;
+
 use std::rc::Rc;
 
 pub struct CpuBackend {
@@ -19,16 +21,30 @@ pub struct CpuBackend {
 }
 
 impl CpuBackend {
-    pub fn new(cgroup_manager: Arc<CgroupManager>) -> CpuBackend { // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
+    pub fn new(cgroup_manager: Arc<CgroupManager>) -> CpuBackend {
+        // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
         let backend_name = "Cpu".to_string();
         let metrics = Rc::new(RefCell::new(HashMap::new()));
+
         for (cgroup_id, cgroup_name) in cgroup_manager.get_cgroups() {
-            let filename = format!("{}/cpu{}/{}/cpu.stat", cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name);
-            let metric_names = get_metric_names(filename);
-            let metric = Metric { job_id: cgroup_id, backend_name: backend_name.clone(), metric_names, metric_values: None };
+            let filename = format!(
+                "{}/cpu{}/{}/cpu.stat",
+                cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name
+            );
+            let metric_names = get_metric_names(&filename);
+            let metric = Metric {
+                job_id: cgroup_id,
+                backend_name: backend_name.clone(),
+                metric_names,
+                metric_values: None,
+            };
             (*metrics).borrow_mut().insert(cgroup_id, metric);
         }
-        CpuBackend { backend_name, cgroup_manager, metrics }
+        CpuBackend {
+            backend_name,
+            cgroup_manager,
+            metrics,
+        }
     }
 }
 
@@ -85,7 +101,8 @@ impl Backend for CpuBackend {
     }
 }
 
-fn get_metric_names(filename: String) -> Vec<String> {
+fn get_metric_names(filename: &String) -> Vec<String> {
+    debug!("openning {}", &filename);
     let mut file = File::open(filename).unwrap();
     let mut content = String::new();
     file.read_to_string(&mut content).unwrap();
@@ -97,13 +114,13 @@ fn get_metric_names(filename: String) -> Vec<String> {
         let tmp2: Vec<&str> = tmp1.split(" ").collect();
         res.push(tmp2[0].to_string());
     }
-//    let metric_names = res[..res.len()].to_vec().into_iter();
+    //    let metric_names = res[..res.len()].to_vec().into_iter();
     let metric_names = res[..res.len()].to_vec();
 
     metric_names
 }
 
-fn get_metric_values(filename: String) -> Vec<i64> {
+fn get_metric_values(filename: &String) -> Vec<i64> {
     let mut file = File::open(filename).unwrap();
     let mut content = String::new();
     file.read_to_string(&mut content).unwrap();

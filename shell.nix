@@ -6,6 +6,7 @@ stdenv.mkDerivation {
     rustc cargo
 
     # Example Build-time Additional Dependencies
+    cmake
     pkgconfig
   ];
   buildInputs = [

@@ -3,16 +3,16 @@ extern crate gethostname;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::backends::metric::Metric;
 use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
-use crate::backends::metric::Metric;
+use crate::wait_file;
 
-use std::slice;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::slice;
 
 extern crate libc;
-
 
 pub struct PerfhwBackend {
     pub backend_name: String,

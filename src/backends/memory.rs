@@ -1,15 +1,16 @@
 extern crate gethostname;
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use std::sync::Arc;
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
+use crate::backends::metric::Metric;
 use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
-use crate::backends::metric::Metric;
+use crate::utils::wait_file;
 
 pub struct MemoryBackend {
     pub backend_name: String,

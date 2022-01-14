@@ -8,20 +8,15 @@ extern crate regex;
 extern crate serde_derive;
 extern crate simple_logger;
 
-use std::sync::{Arc, Mutex};
-use std::thread::sleep;
-use std::time::{Duration, SystemTime};
-use std::rc::Rc;
 use std::cell::RefCell;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+use std::thread::sleep;
+use std::time::{Duration, SystemTime};
 
-use inotify::{
-    EventMask,
-    Inotify,
-    WatchMask,
-};
-
+use crate::utils::wait_file;
 // command line argument parser
 use clap::App;
 
