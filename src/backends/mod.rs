@@ -142,24 +142,37 @@ pub trait Backend {
     fn open(&self);
     fn close(&self);
     fn get_metrics(& self) -> HashMap<i32, Metric>;
+    fn get_some_metrics(&self, metrics_to_get: Vec<String>) -> HashMap<i32, Metric>;
     fn set_metrics_to_get(& self, metrics_to_get: Vec<String>);
 }
 
 pub struct BackendsManager {
     backends: Rc<RefCell<Vec<Box<dyn Backend>>>>,
+    pub metrics_to_get: Vec<(i64, f32, String)>,
+    pub last_timestamp: i64,
+    pub last_measurement: HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>,
+    pub metric_modified: bool,
 }
 
 impl BackendsManager {
-    pub fn new() -> BackendsManager {
+    pub fn new(metrics: Vec<(f32, String)>) -> BackendsManager {
         let backends = Rc::new(RefCell::new(Vec::new()));
-        BackendsManager { backends }
+        let metrics_to_get:Vec<(i64, f32, String)>=Vec::new();
+        for m in metrics {
+            metrics_to_get.push(((m.0*1000.)as i64, m.0, m.1));
+        }
+        let mut last_measurement : HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>=HashMap::new();
+        let mut last_timestamp=0 as i64;
+        let mut metric_modified=false;
+        BackendsManager { backends, metrics_to_get, last_timestamp, last_measurement, metric_modified }
     }
 
     pub fn init_backends(& self, cli_args: CliArgs, cgroup_manager : Arc<CgroupManager>) ->  Rc<RefCell<Vec<Box<dyn Backend>>>> {
         let memory_backend = MemoryBackend::new(cgroup_manager.clone());
         let cpu_backend = CpuBackend::new(cgroup_manager.clone());
+        self.add_backend(Box::new(memory_backend));
+        self.add_backend(Box::new(cpu_backend));
 
-        let perfhw_backend = PerfhwBackend::new(cgroup_manager.clone());
 
         if cli_args.enable_infiniband {
             ()
@@ -171,11 +184,9 @@ impl BackendsManager {
             ()
         }
         if cli_args.enable_perfhw {
-            ()
+            let perfhw_backend = PerfhwBackend::new(cgroup_manager.clone(), cli_args.metrics_to_get);
+            self.add_backend(Box::new(perfhw_backend));
         }
-        self.add_backend(Box::new(memory_backend));
-        self.add_backend(Box::new(cpu_backend));
-        self.add_backend(Box::new(perfhw_backend));
 
         return self.backends.clone();
     }
@@ -185,27 +196,59 @@ impl BackendsManager {
     }
 
 
-    pub fn get_all_metrics(& self, timestamp: i64, hostname: String) -> HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)> {
+// returns a HashMap
+// job_id -> (hostname, timestamp, version, vec of(backend name, metric_names, metric_values))
+    pub fn make_measure(& self, timestamp: i64, hostname: String) {
         let version = *METRICS_VERSION;
-        let mut metrics: HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>= HashMap::new();
+        if self.metric_modified {
+            self.last_measurement = HashMap::new();
+        }
+        //let mut metrics: HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>= HashMap::new();
+        
+        let delta_t=self.last_timestamp-timestamp;
+        let list_metrics=self.update_waiting_metrics(delta_t);
 
         let b = (*self.backends).borrow();
         let bi = b.iter();
         for backend in bi {
-            for (job_id, metric) in backend.get_metrics() {
-                match metrics.get_mut(&job_id) {
+            for (job_id, metric) in backend.get_some_metrics(list_metrics) {
+                match self.last_measurement.get_mut(&job_id) {
+                    // if some metrics have already been added for the same job_id
                     Some(tmp) => {
                         let (_hostname, _timestamp, _version, m) = tmp;
-                        m.push((metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap()));
+                        self.update_measurement(job_id, m.clone());
                     },
+                    // if no metrics were added for the job_id
                     None => {
-                        metrics.insert(job_id, (hostname.clone(), timestamp, version, vec![(metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap() )]));
+                        self.last_measurement.insert(job_id, (hostname.clone(), timestamp, version, vec![(metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap() )]));
                     },
                 }
             }
         }
-        metrics
     }
-
+    pub fn sort_waiting_metrics(& self){
+        self.metrics_to_get.sort_by_key(| k | k.0);
+    }
+    pub fn update_waiting_metrics(&self, delta_t: i64) -> Vec<String>{
+        let list_metrics:Vec<String>=Vec::new();
+       for i in 0..self.metrics_to_get.len() {
+           if self.metrics_to_get[i].0 - delta_t < 0 {
+               list_metrics.push(self.metrics_to_get[1].2);
+               self.metrics_to_get[i].0=(self.metrics_to_get[i].1 * 1000.) as i64;
+           }else{
+               self.metrics_to_get[i].0-=delta_t;
+           }
+       }
+       list_metrics
+    }
+    pub fn update_measurement(&self, job_id: i32, metrics: Vec<(String, Vec<i32>, Vec<i64>)>){
+        let (_hostname, _timestamp, _version, measures)=self.last_measurement.get_mut(&job_id).unwrap();
+        let i=0;
+        for measure in measures {
+              if measure.0==metrics[i].0 && measure.1==metrics[i].1 {
+                  measure.2=metrics[i].2;
+              }
+        }
+        //m.push((metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap()));
+    }
 }
-

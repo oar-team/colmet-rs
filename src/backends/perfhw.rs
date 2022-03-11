@@ -18,19 +18,24 @@ pub struct PerfhwBackend {
     pub backend_name: String,
     cgroup_manager: Arc<CgroupManager>,
     metrics: Rc<RefCell<HashMap<i32, Metric>>>,
-    metrics_to_get: Rc<RefCell<Vec<String>>>,
+    metrics_to_get: Rc<RefCell<Vec<(f32, String)>>>,
 }
 
 impl PerfhwBackend {
-    pub fn new(cgroup_manager: Arc<CgroupManager>) -> PerfhwBackend { // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
+    pub fn new(cgroup_manager: Arc<CgroupManager>, metrics_to_get: Vec<(f32, String)>) -> PerfhwBackend { // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
         let backend_name = "Perfhw".to_string();
 
         let metrics = Rc::new(RefCell::new(HashMap::new()));
 
-        let metrics_to_get = Rc::new(RefCell::new(vec!("instructions".to_string(), "cache_misses".to_string(), "page_faults".to_string())));
+        let metrics_to_get = Rc::new(RefCell::new(metrics_to_get.clone()));
 
         for (cgroup_id, _cgroup_name) in cgroup_manager.get_cgroups() {
-            let metric_names = (*metrics_to_get).borrow().clone();
+            //let metric_names = (*metrics_to_get).borrow().clone();
+            let metric_names: Vec<String>=Vec::new();
+            for m in (*metrics_to_get).borrow().clone() {
+                //debug!("{} {}", cgroup_id.to_string(), m);
+                metric_names.push(m.1);
+            }
             let metric = Metric { job_id: cgroup_id, backend_name: backend_name.clone(), metric_names, metric_values: None };
             (*metrics).borrow_mut().insert(cgroup_id, metric);
         }
@@ -64,7 +69,7 @@ impl Backend for PerfhwBackend {
             let cgroup_name = cgroup_name_string.as_ptr();
 
             let metric_names = format!("{}{}", (*self.metrics_to_get).borrow().join(","), "\0");
-            debug!("Getting mettrics: {}", metric_names);
+            debug!("Getting metrics: {}", metric_names);
             let metric_values = get_metric_values(
                 cgroup_name,
                 metric_names.as_ptr(),
@@ -80,11 +85,15 @@ impl Backend for PerfhwBackend {
         (*self.metrics).borrow_mut().clone()
     }
 
-    fn set_metrics_to_get(& self, metrics_to_get: Vec<String>){
+    fn set_metrics_to_get(& self, metrics_to_get: Vec<(f32, String)>){
         *(*self.metrics_to_get).borrow_mut() = metrics_to_get.clone();
         let mut metrics = HashMap::new();
         for (cgroup_id, _cgroup_name) in self.cgroup_manager.get_cgroups() {
-            let metric_names = metrics_to_get.clone();
+            //let metric_names = metrics_to_get.clone();
+            let metric_names: Vec<String>=Vec::new();
+            for m in metrics_to_get.clone() {
+                metric_names.push(m.1);
+            }
             let metric = Metric {
                 job_id: cgroup_id,
                 backend_name: self.backend_name.clone(),
@@ -96,7 +105,6 @@ impl Backend for PerfhwBackend {
         *(*self.metrics).borrow_mut() = metrics;
     }
 }
-
 fn get_metric_values(cgroup_name: *const u8, metrics_to_get: *const u8, nb_metrics_to_get: usize) -> Vec<i64> {
     #[link(name = "perf_hw", kind="static")]
     extern {

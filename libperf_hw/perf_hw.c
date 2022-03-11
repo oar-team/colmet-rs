@@ -347,19 +347,19 @@ void remove_cgroup(char *cgroup_name) {
    clean_cgroup(current);
 }
 
-//void main(){
-//    char options[] = "page_faults,instructions,cache_node,instructions,instructions";
-//    init_cgroup("/oar/lrocher_1876192", options);
-//    char options2[] = "instructions,page_faults,cache_node";
-//    init_cgroup("/oar/lrocher_2", options2);
-//
-//
-//    long long *counters1 = malloc(sizeof(long long)*3);
-//    long long *counters2 = malloc(sizeof(long long)*3);
-//
-//    get_counters(counters1, "/oar/lrocher_1876192");
-//    get_counters(counters2, "/oar/lrocher_2");
-//
-//    printList();
-//    printf("ok");
-//}
+/*void main(){
+    char options[] = "page_faults,instructions,cache_node,instructions,instructions";
+    init_cgroup("/test1", options);
+    char options2[] = "instructions,page_faults,cache_node";
+    init_cgroup("/test2", options2);
+
+
+    long long *counters1 = malloc(sizeof(long long)*3);
+    long long *counters2 = malloc(sizeof(long long)*3);
+
+    get_counters(counters1, "/test1");
+    get_counters(counters2, "/test2");
+
+    printList();
+    printf("ok");
+}*/

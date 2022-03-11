@@ -15,6 +15,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
+use std::fs;
 
 use crate::utils::wait_file;
 // command line argument parser
@@ -24,6 +25,7 @@ use log::Level;
 
 use crate::backends::BackendsManager;
 use crate::cgroup_manager::CgroupManager;
+use crate::backends::metric::Metric;
 
 mod backends;
 mod cgroup_manager;
@@ -36,8 +38,12 @@ fn main(){
     let cli_args = parse_cli_args();
 
     let sample_period = Arc::new(Mutex::new(cli_args.sample_period));
-
+    
     init_logger(cli_args.verbose);
+    
+    if cli_args.verbose>=3 {
+        debug!("{}", debug_list_metrics(cli_args.clone()));
+    }
 
     let cgroup_cpuset_path = format!(
         "{}/cpuset{}",
@@ -53,7 +59,7 @@ fn main(){
                                             cli_args.cgroup_path_suffix.clone(),
                                             sample_period.clone(), cli_args.sample_period);
 
-    let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new()));
+    let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new(cli_args.metrics_to_get.clone())));
 
     let bm = (*backends_manager_ref).borrow();
     let backends = bm.init_backends(cli_args.clone(), cgroup_manager.clone());
@@ -70,9 +76,10 @@ fn main(){
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
         println!("{:#?}", timestamp);
 
-        let metric = bm.get_all_metrics(timestamp, hostname.clone());
+        //maybe compression needed here
+        let metric = bm.make_measure(timestamp, hostname.clone());
         debug!("time to take measures {} microseconds", now.elapsed().unwrap().as_micros());
-        zmq_sender.send_metrics(metric);
+        zmq_sender.send_metrics(bm.last_measurement.clone());
         zmq_sender.receive_config(sample_period.clone());
         sleep_to_round_timestamp((*(&*sample_period).lock().unwrap()  * 1000000000.0) as u128);
 
@@ -103,12 +110,13 @@ pub struct CliArgs {
     cgroup_path_suffix: String,
     wait_cgroup_cpuset_path: bool,
     regex_job_id: String,
+    metrics_to_get: Vec<(f32, String)>  
 }
 
 fn parse_cli_args() -> CliArgs {
     let yaml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
-    let verbose = matches.occurrences_of("verbose") as i32;
+    let verbose = value_t!(matches, "verbose", i32).unwrap();
     let sample_period = value_t!(matches, "sample-period", f64).unwrap();
     println!("sample period {}", sample_period);
     let enable_infiniband = value_t!(matches, "enable-infiniband", bool).unwrap();
@@ -123,7 +131,26 @@ fn parse_cli_args() -> CliArgs {
     let wait_cgroup_cpuset_path = value_t!(matches, "wait-cgroup-cpuset-path", bool).unwrap();
     let regex_job_id = value_t!(matches, "regex-job-id", String).unwrap();
 
-
+    let metrics_file = value_t!(matches, "metrics_file", String).unwrap();
+    // TODO: make it so its defining a file AND metrics manually fails
+    let mut metrics_to_get = Vec::new();
+    let arg_metrics:String;
+    if !metrics_file.is_empty() { // TODO : fix format of input file (for now only single line is supported)
+        arg_metrics=fs::read_to_string(metrics_file)
+            .expect("Specified metrics file doesn't exists");
+    }
+    else{
+        arg_metrics = value_t!(matches, "metrics", String).unwrap();
+    }
+    if arg_metrics.is_empty() {
+        metrics_to_get.push((-1., "instructions".to_string()));
+        metrics_to_get.push((-1., "cache_misses".to_string()));
+        metrics_to_get.push((-1., "page_faults".to_string()));
+    }else{
+        println!("{}", arg_metrics);
+        metrics_to_get=parse_metrics(arg_metrics);
+    }
+    
     let cli_args = CliArgs {
         verbose,
         sample_period,
@@ -137,9 +164,23 @@ fn parse_cli_args() -> CliArgs {
         cgroup_root_path,
         cgroup_path_suffix,
         wait_cgroup_cpuset_path,
-        regex_job_id
+        regex_job_id,
+        metrics_to_get
     };
     cli_args
+}
+
+fn parse_metrics(arg_string: String) -> Vec<(f32, String)> {
+    let args=arg_string.split(",");
+    let mut metrics = Vec::new();
+    for arg in args{
+        let mut m=arg.split(":");
+        let s = m.next().unwrap().to_string().parse::<f32>()
+            .expect("Error parsing metric sampling period");
+        let tup=(s, m.next().unwrap().to_string());
+        metrics.push(tup);     
+    }
+    metrics
 }
 
 fn init_logger(verbosity_lvl: i32) {
@@ -150,4 +191,17 @@ fn init_logger(verbosity_lvl: i32) {
         3 => simple_logger::init_with_level(Level::Debug).unwrap(),
         _ => simple_logger::init_with_level(Level::Trace).unwrap(),
     }
+}
+fn debug_list_metrics(cli_args: CliArgs) -> String {
+        let mut o:String ="".to_string();
+        for s in &cli_args.metrics_to_get{
+            if o.is_empty(){
+                o=format!("{} {}", s.0, s.1);
+            }
+            else{
+                o=format!("{}, {} {}", o, s.0, s.1);
+            }
+        }
+        o=format!("List of metrics to collect\n\t{}", o);
+        o
 }
