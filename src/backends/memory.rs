@@ -7,7 +7,7 @@ use std::io::Read;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::backends::metric::Metric;
+use crate::backends::metric::MetricValues;
 use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
 use crate::utils::wait_file;
@@ -15,7 +15,7 @@ use crate::utils::wait_file;
 pub struct MemoryBackend {
     pub backend_name: String,
     cgroup_manager: Arc<CgroupManager>,
-    metrics: Rc<RefCell<HashMap<i32, Metric>>>,
+    metrics: Rc<RefCell<HashMap<i32, MetricValues>>>,
 }
 
 impl MemoryBackend {
@@ -37,7 +37,7 @@ impl MemoryBackend {
 
             let metric_names = get_metric_names(filename);
 
-            let metric = Metric {
+            let metric = MetricValues {
                 job_id: cgroup_id,
                 backend_name: backend_name.clone(),
                 metric_names,
@@ -68,7 +68,11 @@ impl Backend for MemoryBackend {
         return self.backend_name.clone();
     }
 
-    fn get_metrics(&self) -> HashMap<i32, Metric> {
+    fn get_some_metrics(&self, metrics_to_get: Vec<String>) -> HashMap<i32, MetricValues> {
+        let ret:HashMap<i32, MetricValues>=HashMap::new();
+        ret
+    }
+    fn get_metrics(&self) -> HashMap<i32, MetricValues> {
         let cgroups = self.cgroup_manager.get_cgroups();
         debug!("mais putain {:#?}", cgroups);
 

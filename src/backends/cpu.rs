@@ -6,6 +6,7 @@ use std::io::Read;
 use std::sync::Arc;
 
 use crate::backends::metric::Metric;
+use crate::backends::metric::MetricValues;
 use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
 
@@ -17,8 +18,8 @@ use std::rc::Rc;
 pub struct CpuBackend {
     pub backend_name: String,
     cgroup_manager: Arc<CgroupManager>,
-    metrics: Rc<RefCell<HashMap<i32, Metric>>>,
-    metrics_to_get: Rc<RefCell<Vec<(f32,String)>>>,
+    metrics: Rc<RefCell<HashMap<i32, MetricValues>>>,
+    metrics_to_get: Rc<RefCell<Vec<Metric>>>,
 }
 
 impl CpuBackend {
@@ -28,7 +29,7 @@ impl CpuBackend {
 
         let metrics = Rc::new(RefCell::new(HashMap::new()));
         
-        let metrics_to_get = Rc::new(RefCell::new(metrics_to_get.clone()));
+        let metrics_to_get = Rc::new(RefCell::new(Vec::new()));
 
         for (cgroup_id, cgroup_name) in cgroup_manager.get_cgroups() {
             let filename = format!(
@@ -36,7 +37,7 @@ impl CpuBackend {
                 cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name
             );
             let metric_names = get_metric_names(&filename);
-            let metric = Metric {
+            let metric = MetricValues {
                 job_id: cgroup_id,
                 backend_name: backend_name.clone(),
                 metric_names,
@@ -66,7 +67,11 @@ impl Backend for CpuBackend {
         return self.backend_name.clone();
     }
 
-    fn get_metrics(&self) -> HashMap<i32, Metric> {
+    fn get_some_metrics(&self, metrics_to_get: Vec<String>) -> HashMap<i32, MetricValues> {
+    let ret:HashMap<i32, MetricValues>=HashMap::new();
+    ret
+    }
+    fn get_metrics(&self) -> HashMap<i32, MetricValues> {
         let cgroups = self.cgroup_manager.get_cgroups();
         debug!("cgroup: {:#?}", cgroups);
 
@@ -84,11 +89,11 @@ impl Backend for CpuBackend {
             let metric_values = get_metric_values(&filename);
 
             let mut borrowed_metrics = self.metrics.borrow_mut();
-            if (borrowed_metrics.contains_key(&cgroup_id)) {
+            if borrowed_metrics.contains_key(&cgroup_id) {
                 borrowed_metrics.get_mut(&cgroup_id).unwrap().metric_values = Some(metric_values);
             } else {
                 let metric_names = get_metric_names(&filename);
-                let metric = Metric {
+                let metric = MetricValues {
                     job_id: cgroup_id,
                     backend_name: self.backend_name.clone(),
                     metric_names,

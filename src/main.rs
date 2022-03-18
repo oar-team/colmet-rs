@@ -26,6 +26,7 @@ use log::Level;
 use crate::backends::BackendsManager;
 use crate::cgroup_manager::CgroupManager;
 use crate::backends::metric::Metric;
+use crate::backends::metric::MetricValues;
 
 mod backends;
 mod cgroup_manager;
@@ -50,6 +51,7 @@ fn main(){
         cli_args.cgroup_root_path.clone(),
         cli_args.cgroup_path_suffix.clone()
     );
+    let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new(cli_args.metrics_to_get.clone())));
 
     wait_file(&cgroup_cpuset_path, cli_args.wait_cgroup_cpuset_path);
 
@@ -59,7 +61,6 @@ fn main(){
                                             cli_args.cgroup_path_suffix.clone(),
                                             sample_period.clone(), cli_args.sample_period);
 
-    let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new(cli_args.metrics_to_get.clone())));
 
     let bm = (*backends_manager_ref).borrow();
     let backends = bm.init_backends(cli_args.clone(), cgroup_manager.clone());
@@ -110,7 +111,7 @@ pub struct CliArgs {
     cgroup_path_suffix: String,
     wait_cgroup_cpuset_path: bool,
     regex_job_id: String,
-    metrics_to_get: Vec<(f32, String)>  
+    metrics_to_get: Vec<Metric>  
 }
 
 fn parse_cli_args() -> CliArgs {
@@ -132,8 +133,8 @@ fn parse_cli_args() -> CliArgs {
     let regex_job_id = value_t!(matches, "regex-job-id", String).unwrap();
 
     let metrics_file = value_t!(matches, "metrics_file", String).unwrap();
-    // TODO: make it so its defining a file AND metrics manually fails
-    let mut metrics_to_get = Vec::new();
+    // TODO: make it so that defining a file AND metrics manually fails
+    let mut metrics_to_get: Vec<Metric> = Vec::new();
     let arg_metrics:String;
     if !metrics_file.is_empty() { // TODO : fix format of input file (for now only single line is supported)
         arg_metrics=fs::read_to_string(metrics_file)
@@ -143,9 +144,9 @@ fn parse_cli_args() -> CliArgs {
         arg_metrics = value_t!(matches, "metrics", String).unwrap();
     }
     if arg_metrics.is_empty() {
-        metrics_to_get.push((-1., "instructions".to_string()));
-        metrics_to_get.push((-1., "cache_misses".to_string()));
-        metrics_to_get.push((-1., "page_faults".to_string()));
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1.});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache_misses".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1.});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "page_faults".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1.});
     }else{
         println!("{}", arg_metrics);
         metrics_to_get=parse_metrics(arg_metrics);
@@ -170,15 +171,20 @@ fn parse_cli_args() -> CliArgs {
     cli_args
 }
 
-fn parse_metrics(arg_string: String) -> Vec<(f32, String)> {
+fn parse_metrics(arg_string: String) -> Vec<Metric> {
     let args=arg_string.split(",");
     let mut metrics = Vec::new();
     for arg in args{
         let mut m=arg.split(":");
         let s = m.next().unwrap().to_string().parse::<f32>()
             .expect("Error parsing metric sampling period");
-        let tup=(s, m.next().unwrap().to_string());
-        metrics.push(tup);     
+        let met = Metric {
+            job_id: -1,
+            sampling_period: s,
+            metric_name:m.next().unwrap().to_string(),
+            backend_name: "null".to_string(),
+        };
+        metrics.push(met);     
     }
     metrics
 }
@@ -196,10 +202,10 @@ fn debug_list_metrics(cli_args: CliArgs) -> String {
         let mut o:String ="".to_string();
         for s in &cli_args.metrics_to_get{
             if o.is_empty(){
-                o=format!("{} {}", s.0, s.1);
+                o=format!("{:?}", s);
             }
             else{
-                o=format!("{}, {} {}", o, s.0, s.1);
+                o=format!("{}, {:?}", o, s);
             }
         }
         o=format!("List of metrics to collect\n\t{}", o);
