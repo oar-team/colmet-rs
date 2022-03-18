@@ -12,7 +12,7 @@ build="build.rs"
 clap = {version = "2.33", features = ["yaml"]} # command line arguments parser
 zmq = "0.9"
 log = "0.4"
-simple_logger = "1.13.0"
+simple_logger = "2.1.0"
 inotify = "0.7.0"
 futures = "0.1.28"
 tempdir = "0.3.7"
