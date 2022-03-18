@@ -59,15 +59,46 @@ impl Backend for CpuBackend {
         println!("hello my name is cpu backend");
     }
 
-    fn open(&self) {}
-
-    fn close(&self) {}
-
     fn get_backend_name(&self) -> String{
         return self.backend_name.clone();
     }
+    fn return_values(&self, metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
+        let ret:HashMap<i32, MetricValues>=HashMap::new();
+        let cgroups = self.cgroup_manager.get_cgroups();
+        debug!("cgroup: {:#?}", cgroups);
 
-    fn get_some_metrics(&self, metrics_to_get: Vec<String>) -> HashMap<i32, MetricValues> {
+        for (cgroup_id, cgroup_name) in cgroups {
+            if metrics_to_get.get(&cgroup_id).is_some() {
+                let filename = format!(
+                    "{}/cpu{}/{}/cpu.stat",
+                    self.cgroup_manager.cgroup_root_path,
+                    self.cgroup_manager.cgroup_path_suffix,
+                    cgroup_name
+                );
+
+                wait_file(&filename, true);
+                debug!("metrics: {:#?}", self.metrics);
+
+                let metric_values = get_metric_values(&filename, metrics_to_get.get(&cgroup_id).unwrap().clone());
+
+                if ret.contains_key(&cgroup_id) {
+                    ret.get_mut(&cgroup_id).unwrap().metric_values = Some(metric_values);
+                } else {
+                    let metric_names = get_metric_names(&filename);
+                    let metric = MetricValues {
+                        job_id: cgroup_id,
+                        backend_name: self.backend_name.clone(),
+                        metric_names,
+                        metric_values: Some(metric_values),
+                    };
+                    ret.insert(cgroup_id, metric);
+                }
+            }
+        }
+        //println!("new metric {:#?}", self.metrics.clone());
+        ret  
+    }
+    /*fn get_some_metrics(&self, metrics_to_get: Vec<String>) -> HashMap<i32, MetricValues> {
     let ret:HashMap<i32, MetricValues>=HashMap::new();
     ret
     }
@@ -108,7 +139,7 @@ impl Backend for CpuBackend {
 
     fn set_metrics_to_get(& self, _metrics_to_get: Vec<String>){
         ()
-    }
+    }*/
 }
 
 fn get_metric_names(filename: &String) -> Vec<String> {
@@ -130,7 +161,7 @@ fn get_metric_names(filename: &String) -> Vec<String> {
     metric_names
 }
 
-fn get_metric_values(filename: &String) -> Vec<i64> {
+fn get_metric_values(filename: &String, metrics_to_get: Vec<Metric>) -> Vec<i64> {
     let mut file = File::open(filename).unwrap();
     let mut content = String::new();
     file.read_to_string(&mut content).unwrap();
@@ -140,6 +171,7 @@ fn get_metric_values(filename: &String) -> Vec<i64> {
         let line = lines[i];
         let tmp1 = line.to_string();
         let tmp2: Vec<&str> = tmp1.split(" ").collect();
+        if(
         res.push(tmp2[1].parse::<i64>().unwrap());
     }
     let metric_values = res[..res.len()].to_vec();
