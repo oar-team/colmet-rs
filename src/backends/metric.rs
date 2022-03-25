@@ -22,10 +22,10 @@ impl Serialize for MetricValues {
         S:Serializer,
     {
         let mut state = serializer.serialize_struct("MetricValues", 4)?;
-        state.serialize_field("job_id", &self.job_id);
-        state.serialize_field("backend_name", &self.backend_name);
-        state.serialize_field("metric_names", &self.metric_names);
-        state.serialize_field("metric_values", &self.metric_values);
+        state.serialize_field("job_id", &self.job_id).expect("error when serializing job_id in MetricValues");
+        state.serialize_field("backend_name", &self.backend_name).expect("error when serializing backend_name in MetricValues");
+        state.serialize_field("metric_names", &self.metric_names).expect("error when serializing metric_name in MetricValues");
+        state.serialize_field("metric_values", &self.metric_values).expect("error when serializing metric_values in MetricValues");
         state.end()
     }
 }
