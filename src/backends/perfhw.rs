@@ -3,13 +3,11 @@ extern crate gethostname;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::backends::metric::Metric;
 use crate::backends::metric::MetricValues;
 use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
-use crate::wait_file;
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::slice;
 
 extern crate libc;
@@ -17,29 +15,13 @@ extern crate libc;
 pub struct PerfhwBackend {
     pub backend_name: String,
     cgroup_manager: Arc<CgroupManager>,
-    metrics: Rc<RefCell<HashMap<i32, MetricValues>>>,
-    metrics_to_get: Rc<RefCell<Vec<String>>>,
 }
 
 impl PerfhwBackend {
-    pub fn new(cgroup_manager: Arc<CgroupManager>, metrics_to_get: Vec<String>) -> PerfhwBackend { // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
+    pub fn new(cgroup_manager: Arc<CgroupManager>) -> PerfhwBackend { // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
         let backend_name = "Perfhw".to_string();
 
-        let metrics = Rc::new(RefCell::new(HashMap::new()));
-
-        let metrics_to_get = Rc::new(RefCell::new(metrics_to_get.clone()));
-
-        for (cgroup_id, _cgroup_name) in cgroup_manager.get_cgroups() {
-            //let metric_names = (*metrics_to_get).borrow().clone();
-            let mut metric_names: Vec<String>=Vec::new();
-            for m in (*metrics_to_get).borrow().clone() {
-                //debug!("{} {}", cgroup_id.to_string(), m);
-                metric_names.push(m);
-            }
-            let metric = MetricValues { job_id: cgroup_id, backend_name: backend_name.clone(), metric_names, metric_values: None };
-            (*metrics).borrow_mut().insert(cgroup_id, metric);
-        }
-        PerfhwBackend { backend_name, cgroup_manager, metrics, metrics_to_get }
+        PerfhwBackend { backend_name, cgroup_manager }
     }
 }
 
@@ -52,15 +34,8 @@ impl Backend for PerfhwBackend {
         return self.backend_name.clone();
     }
 
-    fn open(&self) {}
-
-    fn close(&self) {}
-
-    fn get_some_metrics(&self, metrics_to_get: Vec<String>) -> HashMap<i32, MetricValues> {
-        let ret:HashMap<i32, MetricValues>=HashMap::new();
-        ret
-    }
-    fn get_metrics(&self) -> HashMap<i32, MetricValues> {
+    fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
+        let mut ret:HashMap<i32, MetricValues>=HashMap::new();
         let cgroups = self.cgroup_manager.get_cgroups();
         debug!("cgroup: {:#?}", cgroups);
 
@@ -71,44 +46,38 @@ impl Backend for PerfhwBackend {
             );
             let cgroup_name_string = format!("/oar/{}{}", cgroup_name, "\0").to_string();
             let cgroup_name = cgroup_name_string.as_ptr();
-
-            let metric_names = format!("{}{}", (*self.metrics_to_get).borrow().join(","), "\0");
+            let mut metric_names="".to_string();
+            for m in metrics_to_get.get_mut(&cgroup_id).unwrap(){
+                 metric_names= format!("{} {}",  metric_names , m.metric_name);
+            }
+            metric_names = format!("{}{}", metric_names, "\0");
             debug!("Getting metrics: {}", metric_names);
-            let metric_values = get_metric_values(
+            let mut metric_values = get_metric_values(
                 cgroup_name,
                 metric_names.as_ptr(),
-                (*self.metrics_to_get).borrow().len(),
+                metrics_to_get.get(&cgroup_id).unwrap().len(),
             ); // https://doc.rust-lang.org/std/ffi/struct.CString.html this type seems more appropriate but I cant get it to work
-            (*self.metrics)
-                .borrow_mut()
-                .get_mut(&cgroup_id)
-                .unwrap()
-                .metric_values = Some(metric_values);
+               if ret.contains_key(&cgroup_id) {
+                    ret.get_mut(&cgroup_id).unwrap().metric_values.append(metric_values.as_mut());
+                } else {
+                    let mut m_names: Vec<String>=Vec::new();
+                    for m in metrics_to_get.get_mut(&cgroup_id).unwrap() {
+                        m_names.push(m.metric_name.clone());
+                    }
+                    let metric = MetricValues {
+                        job_id: cgroup_id,
+                        backend_name: self.backend_name.clone(),
+                        metric_names: m_names,
+                        metric_values,
+                    };
+                    ret.insert(cgroup_id, metric);
+                }
         }
-        println!("new metric {:#?}", self.metrics.clone());
-        (*self.metrics).borrow_mut().clone()
+        ret
     }
 
-    fn set_metrics_to_get(& self, metrics_to_get: Vec<String>){
-        *(*self.metrics_to_get).borrow_mut() = metrics_to_get.clone();
-        let mut metrics = HashMap::new();
-        for (cgroup_id, _cgroup_name) in self.cgroup_manager.get_cgroups() {
-            //let metric_names = metrics_to_get.clone();
-            let mut metric_names: Vec<String>=Vec::new();
-            for m in metrics_to_get.clone() {
-                metric_names.push(m);
-            }
-            let metric = MetricValues {
-                job_id: cgroup_id,
-                backend_name: self.backend_name.clone(),
-                metric_names,
-                metric_values: None,
-            };
-            metrics.insert(cgroup_id, metric);
-        }
-        *(*self.metrics).borrow_mut() = metrics;
-    }
 }
+
 fn get_metric_values(cgroup_name: *const u8, metrics_to_get: *const u8, nb_metrics_to_get: usize) -> Vec<i64> {
     #[link(name = "perf_hw", kind="static")]
     extern {
@@ -118,7 +87,7 @@ fn get_metric_values(cgroup_name: *const u8, metrics_to_get: *const u8, nb_metri
     extern "C" {
         fn get_counters(values: *mut i64, cgroup_name: *const u8) -> i32;
     }
-
+    // calling init_cgroup does nothing if the cgroup is already in the list
     let _res = unsafe {init_cgroup(cgroup_name, metrics_to_get)};
     let mut buffer = Vec::with_capacity(nb_metrics_to_get*64 as usize);
     let buffer_ptr = buffer.as_mut_ptr();

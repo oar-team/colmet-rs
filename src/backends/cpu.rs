@@ -41,7 +41,7 @@ impl CpuBackend {
                 job_id: cgroup_id,
                 backend_name: backend_name.clone(),
                 metric_names,
-                metric_values: None,
+                metric_values: Vec::new(),
             };
             (*metrics).borrow_mut().insert(cgroup_id, metric);
         }
@@ -62,8 +62,8 @@ impl Backend for CpuBackend {
     fn get_backend_name(&self) -> String{
         return self.backend_name.clone();
     }
-    fn return_values(&self, metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
-        let ret:HashMap<i32, MetricValues>=HashMap::new();
+    fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
+        let mut ret:HashMap<i32, MetricValues>=HashMap::new();
         let cgroups = self.cgroup_manager.get_cgroups();
         debug!("cgroup: {:#?}", cgroups);
 
@@ -79,67 +79,27 @@ impl Backend for CpuBackend {
                 wait_file(&filename, true);
                 debug!("metrics: {:#?}", self.metrics);
 
-                let metric_values = get_metric_values(&filename, metrics_to_get.get(&cgroup_id).unwrap().clone());
+                let mut metric_values = get_metric_values(&filename, metrics_to_get.get(&cgroup_id).unwrap().clone());
 
                 if ret.contains_key(&cgroup_id) {
-                    ret.get_mut(&cgroup_id).unwrap().metric_values = Some(metric_values);
+                    ret.get_mut(&cgroup_id).unwrap().metric_values.append(metric_values.as_mut());
                 } else {
-                    let metric_names = get_metric_names(&filename);
+                    let mut m_names: Vec<String>=Vec::new();
+                    for m in metrics_to_get.get_mut(&cgroup_id).unwrap() {
+                        m_names.push(m.metric_name.clone());
+                    }
                     let metric = MetricValues {
                         job_id: cgroup_id,
                         backend_name: self.backend_name.clone(),
-                        metric_names,
-                        metric_values: Some(metric_values),
+                        metric_names: m_names,
+                        metric_values,
                     };
                     ret.insert(cgroup_id, metric);
                 }
             }
         }
-        //println!("new metric {:#?}", self.metrics.clone());
         ret  
     }
-    /*fn get_some_metrics(&self, metrics_to_get: Vec<String>) -> HashMap<i32, MetricValues> {
-    let ret:HashMap<i32, MetricValues>=HashMap::new();
-    ret
-    }
-    fn get_metrics(&self) -> HashMap<i32, MetricValues> {
-        let cgroups = self.cgroup_manager.get_cgroups();
-        debug!("cgroup: {:#?}", cgroups);
-
-        for (cgroup_id, cgroup_name) in cgroups {
-            let filename = format!(
-                "{}/cpu{}/{}/cpu.stat",
-                self.cgroup_manager.cgroup_root_path,
-                self.cgroup_manager.cgroup_path_suffix,
-                cgroup_name
-            );
-
-            wait_file(&filename, true);
-            debug!("metrics: {:#?}", self.metrics);
-
-            let metric_values = get_metric_values(&filename);
-
-            let mut borrowed_metrics = self.metrics.borrow_mut();
-            if borrowed_metrics.contains_key(&cgroup_id) {
-                borrowed_metrics.get_mut(&cgroup_id).unwrap().metric_values = Some(metric_values);
-            } else {
-                let metric_names = get_metric_names(&filename);
-                let metric = MetricValues {
-                    job_id: cgroup_id,
-                    backend_name: self.backend_name.clone(),
-                    metric_names,
-                    metric_values: Some(metric_values),
-                };
-                borrowed_metrics.insert(cgroup_id, metric);
-            }
-        }
-//        println!("new metric {:#?}", self.metrics.clone());
-        (*self.metrics).borrow_mut().clone()
-    }
-
-    fn set_metrics_to_get(& self, _metrics_to_get: Vec<String>){
-        ()
-    }*/
 }
 
 fn get_metric_names(filename: &String) -> Vec<String> {
@@ -167,13 +127,20 @@ fn get_metric_values(filename: &String, metrics_to_get: Vec<Metric>) -> Vec<i64>
     file.read_to_string(&mut content).unwrap();
     let lines: Vec<&str> = content.split("\n").collect();
     let mut res: Vec<i64> = Vec::new();
+    let mut h:HashMap<String, String>=HashMap::new();
+    // not really efficient. TODO: find an appropriate data structure to efficiently recover the
+    // data specified in metrics_to_get
     for i in 0..lines.len() - 1 {
         let line = lines[i];
         let tmp1 = line.to_string();
         let tmp2: Vec<&str> = tmp1.split(" ").collect();
-        if(
-        res.push(tmp2[1].parse::<i64>().unwrap());
+        h.insert(tmp2[0].to_string(), tmp2[1].to_string());
     }
-    let metric_values = res[..res.len()].to_vec();
-    metric_values
+    for m in metrics_to_get {
+        res.push(h.get_mut(&m.metric_name).unwrap().parse::<i64>().unwrap());
+    }
+    // why did he do this ???
+    //let metric_values = res[..res.len()].to_vec();
+    //metric_values
+    res
 }

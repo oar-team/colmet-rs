@@ -11,6 +11,7 @@ use rmps::{Deserializer, Serializer};
 use self::zmq::Message;
 use std::sync::{Arc, Mutex};
 use crate::backends::Backend;
+use crate::backends::metric::MetricValues;
 
 pub struct ZmqSender<'a> {
     sender: zmq::Socket, // sends counters to colmet-collector
@@ -37,7 +38,7 @@ impl ZmqSender<'_> {
 
     }
 
-    pub fn send_metrics(&self, metrics: HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>) {
+    pub fn send_metrics(&self, metrics: HashMap<i32, (String, i64, i64, Vec<MetricValues>)>) {
         let mut buf = Vec::new();
         match metrics.serialize(&mut Serializer::new(&mut buf)){
             Err(e) => println!("{}", e),
@@ -66,7 +67,7 @@ impl ZmqSender<'_> {
                         for metric in m{
                             metrics.push(metric.to_string());
                         }
-                        backend.set_metrics_to_get(metrics);
+                        //backend.set_metrics_to_get(metrics);
                     }
                 }
             }

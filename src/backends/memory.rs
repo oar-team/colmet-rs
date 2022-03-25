@@ -7,6 +7,7 @@ use std::io::Read;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::backends::metric::Metric;
 use crate::backends::metric::MetricValues;
 use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
@@ -41,7 +42,7 @@ impl MemoryBackend {
                 job_id: cgroup_id,
                 backend_name: backend_name.clone(),
                 metric_names,
-                metric_values: None,
+                metric_values: Vec::new(),
             };
             (*metrics).borrow_mut().insert(cgroup_id, metric);
         }
@@ -57,22 +58,12 @@ impl Backend for MemoryBackend {
     fn say_hello(&self) {
         println!("hello my name is memory backend");
     }
-
-    fn open(&self) {
-        debug!("Opening backend memory");
-    }
-
-    fn close(&self) {}
-
     fn get_backend_name(&self) -> String {
         return self.backend_name.clone();
     }
-
-    fn get_some_metrics(&self, metrics_to_get: Vec<String>) -> HashMap<i32, MetricValues> {
-        let ret:HashMap<i32, MetricValues>=HashMap::new();
-        ret
-    }
-    fn get_metrics(&self) -> HashMap<i32, MetricValues> {
+    
+    fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
+        let mut ret:HashMap<i32, MetricValues>=HashMap::new();
         let cgroups = self.cgroup_manager.get_cgroups();
         debug!("mais putain {:#?}", cgroups);
 
@@ -88,18 +79,25 @@ impl Backend for MemoryBackend {
 
             debug!("metrics: {:#?}", self.metrics);
 
-            let metric_values = get_metric_values(filename);
-            (*self.metrics)
-                .borrow_mut()
-                .get_mut(&cgroup_id)
-                .unwrap()
-                .metric_values = Some(metric_values);
-        }
-        (*self.metrics).borrow_mut().clone()
-    }
+                let mut metric_values = get_metric_values(&filename, metrics_to_get.get(&cgroup_id).unwrap().clone());
 
-    fn set_metrics_to_get(&self, _metrics_to_get: Vec<String>) {
-        ()
+                if ret.contains_key(&cgroup_id) {
+                    ret.get_mut(&cgroup_id).unwrap().metric_values.append(metric_values.as_mut());
+                } else {
+                    let mut m_names: Vec<String>=Vec::new();
+                    for m in metrics_to_get.get_mut(&cgroup_id).unwrap() {
+                        m_names.push(m.metric_name.clone());
+                    }
+                    let metric = MetricValues {
+                        job_id: cgroup_id,
+                        backend_name: self.backend_name.clone(),
+                        metric_names: m_names,
+                        metric_values,
+                    };
+                    ret.insert(cgroup_id, metric);
+                }
+            }
+        ret  
     }
 }
 
@@ -122,18 +120,26 @@ fn get_metric_names(filename: String) -> Vec<String> {
     metric_names
 }
 
-fn get_metric_values(filename: String) -> Vec<i64> {
+fn get_metric_values(filename: &String, metrics_to_get: Vec<Metric>) -> Vec<i64> {
     let mut file = File::open(filename).unwrap();
     let mut content = String::new();
     file.read_to_string(&mut content).unwrap();
     let lines: Vec<&str> = content.split("\n").collect();
     let mut res: Vec<i64> = Vec::new();
+    let mut h:HashMap<String, String>=HashMap::new();
+    // not really efficient. TODO: find an appropriate data structure to efficiently recover the
+    // data specified in metrics_to_get
     for i in 0..lines.len() - 1 {
         let line = lines[i];
         let tmp1 = line.to_string();
         let tmp2: Vec<&str> = tmp1.split(" ").collect();
-        res.push(tmp2[1].parse::<i64>().unwrap());
+        h.insert(tmp2[0].to_string(), tmp2[1].to_string());
     }
-    let metric_values = res[..res.len()].to_vec();
-    metric_values
+    for m in metrics_to_get {
+        res.push(h.get_mut(&m.metric_name).unwrap().parse::<i64>().unwrap());
+    }
+    // why did he do this ???
+    //let metric_values = res[..res.len()].to_vec();
+    //metric_values
+    res
 }

@@ -51,7 +51,8 @@ fn main(){
         cli_args.cgroup_root_path.clone(),
         cli_args.cgroup_path_suffix.clone()
     );
-    let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new(cli_args.metrics_to_get.clone())));
+    //let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new(cli_args.metrics_to_get.clone())));
+    let mut backend_manager=BackendsManager::new(cli_args.metrics_to_get.clone());
 
     wait_file(&cgroup_cpuset_path, cli_args.wait_cgroup_cpuset_path);
 
@@ -62,8 +63,10 @@ fn main(){
                                             sample_period.clone(), cli_args.sample_period);
 
 
-    let bm = (*backends_manager_ref).borrow();
-    let backends = bm.init_backends(cli_args.clone(), cgroup_manager.clone());
+    //let bm = (*backends_manager_ref).borrow();
+    //let backends = bm.init_backends(cli_args.clone(), cgroup_manager.clone());
+    let backends=backend_manager.init_backends(cli_args.clone(), cgroup_manager.clone());
+
 
     let b_backends = &(*backends).borrow();
     let zmq_sender = zeromq::ZmqSender::init(b_backends);
@@ -78,11 +81,11 @@ fn main(){
         println!("{:#?}", timestamp);
 
         //maybe compression needed here
-        let metric = bm.make_measure(timestamp, hostname.clone());
+        backend_manager.make_measure(timestamp, hostname.clone());
         debug!("time to take measures {} microseconds", now.elapsed().unwrap().as_micros());
-        zmq_sender.send_metrics(bm.last_measurement.clone());
+        zmq_sender.send_metrics(backend_manager.last_measurement.clone());
         zmq_sender.receive_config(sample_period.clone());
-        sleep_to_round_timestamp((*(&*sample_period).lock().unwrap()  * 1000000000.0) as u128);
+        sleep_to_round_timestamp(backend_manager.get_sleep_time());
 
     }
 }
@@ -144,9 +147,9 @@ fn parse_cli_args() -> CliArgs {
         arg_metrics = value_t!(matches, "metrics", String).unwrap();
     }
     if arg_metrics.is_empty() {
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1.});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache_misses".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1.});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "page_faults".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1.});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache_misses".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "page_faults".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
     }else{
         println!("{}", arg_metrics);
         metrics_to_get=parse_metrics(arg_metrics);
@@ -181,6 +184,7 @@ fn parse_metrics(arg_string: String) -> Vec<Metric> {
         let met = Metric {
             job_id: -1,
             sampling_period: s,
+            time_remaining_before_next_measure: (s*1000.0)as i64,
             metric_name:m.next().unwrap().to_string(),
             backend_name: "null".to_string(),
         };
