@@ -52,7 +52,7 @@ fn main(){
         cli_args.cgroup_path_suffix.clone()
     );
     //let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new(cli_args.metrics_to_get.clone())));
-    let mut backend_manager=BackendsManager::new(cli_args.metrics_to_get.clone());
+    let mut backend_manager=BackendsManager::new(cli_args.sample_period, cli_args.metrics_to_get.clone());
 
     wait_file(&cgroup_cpuset_path, cli_args.wait_cgroup_cpuset_path);
 
@@ -83,8 +83,10 @@ fn main(){
         //maybe compression needed here
         backend_manager.make_measure(timestamp, hostname.clone());
         debug!("time to take measures {} microseconds", now.elapsed().unwrap().as_micros());
-        zmq_sender.send_metrics(backend_manager.last_measurement.clone());
-        zmq_sender.receive_config(sample_period.clone());
+        let m = backend_manager.last_measurement.clone();
+        println!("{:?}", m);
+        zmq_sender.send_metrics(m);
+        //zmq_sender.receive_config(sample_period.clone());
         sleep_to_round_timestamp(backend_manager.get_sleep_time());
 
     }
@@ -147,9 +149,9 @@ fn parse_cli_args() -> CliArgs {
         arg_metrics = value_t!(matches, "metrics", String).unwrap();
     }
     if arg_metrics.is_empty() {
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache_misses".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "page_faults".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
+        //metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache".to_string(), backend_name: "Memory".to_string(), sampling_period: 10., time_remaining_before_next_measure: (10.*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: 1., time_remaining_before_next_measure: (1.*1000.0) as i64});
     }else{
         println!("{}", arg_metrics);
         metrics_to_get=parse_metrics(arg_metrics);

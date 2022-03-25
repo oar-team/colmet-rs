@@ -22,7 +22,7 @@ pub struct MemoryBackend {
 impl MemoryBackend {
     pub fn new(cgroup_manager: Arc<CgroupManager>) -> MemoryBackend {
         // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
-        let backend_name = "Memory".to_string();
+        let backend_name = "memory".to_string();
         let metrics = Rc::new(RefCell::new(HashMap::new()));
 
         let cgroups = cgroup_manager.get_cgroups();
@@ -65,19 +65,28 @@ impl Backend for MemoryBackend {
     fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
         let mut ret:HashMap<i32, MetricValues>=HashMap::new();
         let cgroups = self.cgroup_manager.get_cgroups();
-        debug!("mais putain {:#?}", cgroups);
+        debug!("cgroup: {:#?}", cgroups);
 
         for (cgroup_id, cgroup_name) in cgroups {
-            let filename = format!(
-                "{}/memory{}/{}/memory.stat",
-                self.cgroup_manager.cgroup_root_path,
-                self.cgroup_manager.cgroup_path_suffix,
-                cgroup_name
-            );
+            if metrics_to_get.get(&(-1)).is_some() {
+                if metrics_to_get.get(&cgroup_id).is_none(){
+                    let v:Vec<Metric>=Vec::new();
+                    metrics_to_get.insert(cgroup_id, v);
+                }
+                for m in metrics_to_get.get(&(-1)).unwrap().clone() {
+                    metrics_to_get.get_mut(&cgroup_id).unwrap().push(m);
+                }
+            }
+            if metrics_to_get.get(&cgroup_id).is_some() {
+                let filename = format!(
+                    "{}/memory{}/{}/memory.stat",
+                    self.cgroup_manager.cgroup_root_path,
+                    self.cgroup_manager.cgroup_path_suffix,
+                    cgroup_name
+                );
 
-            wait_file(&filename, true);
-
-            debug!("metrics: {:#?}", self.metrics);
+                wait_file(&filename, true);
+                debug!("metrics: {:#?}", self.metrics);
 
                 let mut metric_values = get_metric_values(&filename, metrics_to_get.get(&cgroup_id).unwrap().clone());
 
@@ -97,6 +106,7 @@ impl Backend for MemoryBackend {
                     ret.insert(cgroup_id, metric);
                 }
             }
+        }
         ret  
     }
 }

@@ -19,7 +19,7 @@ pub struct PerfhwBackend {
 
 impl PerfhwBackend {
     pub fn new(cgroup_manager: Arc<CgroupManager>) -> PerfhwBackend { // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
-        let backend_name = "Perfhw".to_string();
+        let backend_name = "perfhw".to_string();
 
         PerfhwBackend { backend_name, cgroup_manager }
     }
@@ -47,9 +47,28 @@ impl Backend for PerfhwBackend {
             let cgroup_name_string = format!("/oar/{}{}", cgroup_name, "\0").to_string();
             let cgroup_name = cgroup_name_string.as_ptr();
             let mut metric_names="".to_string();
-            for m in metrics_to_get.get_mut(&cgroup_id).unwrap(){
-                 metric_names= format!("{} {}",  metric_names , m.metric_name);
+            
+            if metrics_to_get.get_mut(&cgroup_id).is_some() {
+                for m in metrics_to_get.get_mut(&cgroup_id).unwrap(){
+                    metric_names= format!("{} {}",  metric_names , m.metric_name);
+                }
             }
+            if metrics_to_get.get(&(-1)).is_some() {
+                if metrics_to_get.get(&cgroup_id).is_none() {
+                    let v:Vec<Metric>=Vec::new();
+                    metrics_to_get.insert(cgroup_id, v);
+                }
+                for m in metrics_to_get.get(&(-1)).unwrap().clone() {
+                    if metric_names.len()==0 {
+                        metric_names=format!("{}", m.metric_name);
+                    }else{
+                        metric_names= format!("{},{}",  metric_names , m.metric_name);
+                    }
+                    metrics_to_get.get_mut(&cgroup_id).unwrap().push(m);
+                }
+
+            }
+
             metric_names = format!("{}{}", metric_names, "\0");
             debug!("Getting metrics: {}", metric_names);
             let mut metric_values = get_metric_values(

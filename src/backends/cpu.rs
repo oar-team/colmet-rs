@@ -25,7 +25,7 @@ pub struct CpuBackend {
 impl CpuBackend {
     pub fn new(cgroup_manager: Arc<CgroupManager>) -> CpuBackend {
         // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
-        let backend_name = "Cpu".to_string();
+        let backend_name = "cpu".to_string();
 
         let metrics = Rc::new(RefCell::new(HashMap::new()));
         
@@ -62,12 +62,21 @@ impl Backend for CpuBackend {
     fn get_backend_name(&self) -> String{
         return self.backend_name.clone();
     }
-    fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
+fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
         let mut ret:HashMap<i32, MetricValues>=HashMap::new();
         let cgroups = self.cgroup_manager.get_cgroups();
         debug!("cgroup: {:#?}", cgroups);
 
         for (cgroup_id, cgroup_name) in cgroups {
+            if metrics_to_get.get(&(-1)).is_some() {
+                if metrics_to_get.get(&cgroup_id).is_none(){
+                    let v:Vec<Metric>=Vec::new();
+                    metrics_to_get.insert(cgroup_id, v);
+                }
+                for m in metrics_to_get.get(&(-1)).unwrap().clone() {
+                    metrics_to_get.get_mut(&cgroup_id).unwrap().push(m);
+                }
+            }
             if metrics_to_get.get(&cgroup_id).is_some() {
                 let filename = format!(
                     "{}/cpu{}/{}/cpu.stat",
@@ -101,6 +110,7 @@ impl Backend for CpuBackend {
         ret  
     }
 }
+
 
 fn get_metric_names(filename: &String) -> Vec<String> {
     debug!("openning {}", &filename);
