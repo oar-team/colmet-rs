@@ -75,7 +75,7 @@ fn main(){
     let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
     
     // main loop that pull backends measurements periodically ans send them with zeromq
-    loop {
+    for i in 1..10 {
         let now = SystemTime::now();
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
         println!("{:#?}", timestamp);
