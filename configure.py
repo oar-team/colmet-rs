@@ -8,7 +8,7 @@ def main():
     context = zmq.Context()
     sender = context.socket(zmq.PUSH)
 
-    sender.setsockopt(zmq.LINGER, 0)
+    sender.setsockopt(zmq.LINGER, 2000)
     sender.setsockopt(zmq.SNDHWM, 1000)
 
     sender.connect("tcp://127.0.0.1:5557")

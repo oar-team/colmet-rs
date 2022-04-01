@@ -71,6 +71,14 @@ fn main(){
     
     // main loop that pull backends measurements periodically ans send them with zeromq
     loop {
+        let config=zmq_sender.receive_config();
+        if config.is_some(){
+            let res:Rc<HashMap<String, String>>=Rc::new(config.unwrap());
+            let sample_period:f32=res["sample_period"].clone().parse::<f32>().unwrap();
+            match parse_metrics(res["metrics"].clone()){
+                None => (),
+                Some(new_metrics) => { backend_manager.update_metrics_to_get(sample_period, new_metrics); println!("New metrics \\o/");  }
+            }
         let now = SystemTime::now();
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
         println!("{:#?}", timestamp);
@@ -85,14 +93,6 @@ fn main(){
             debug!("{:?}", m);
             zmq_sender.send_metrics(m);
         }
-        let config=zmq_sender.receive_config();
-        if config.is_some(){
-            let res:Rc<HashMap<String, String>>=Rc::new(config.unwrap());
-            let sample_period:f32=res["sample_period"].clone().parse::<f32>().unwrap();
-            match parse_metrics(res["metrics"].clone()){
-                None => (),
-                Some(new_metrics) => { backend_manager.update_metrics_to_get(sample_period, new_metrics); println!("New metrics \\o/");}
-            }
         }
         sleep_to_round_timestamp(backend_manager.get_sleep_time());
     }
