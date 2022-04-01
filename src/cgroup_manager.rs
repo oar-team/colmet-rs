@@ -21,12 +21,12 @@ pub struct CgroupManager {
     pub cgroup_path_suffix: String,
     cgroups: Mutex<HashMap<i32, String>>, // cgroup corresponding to user jobs, keys : cgroup id, values : cgroup name
     regex_job_id: String, // regex to find the cpuset directory
-    initial_sample_period: f64, // sample period as defined by command line argument at the start of colmet
-    current_sample_period: Arc<Mutex<f64>>, // current sample period, it can be changed by user by sending a new config with 0mq
+    initial_sample_period: f32, // sample period as defined by command line argument at the start of colmet
+    current_sample_period: Arc<Mutex<f32>>, // current sample period, it can be changed by user by sending a new config with 0mq
 }
 
 impl CgroupManager {
-    pub fn new(regex_job_id: String, cgroup_root_path: String, cgroup_path_suffix: String, current_sample_period: Arc<Mutex<f64>>, initial_sample_period: f64) -> Arc<CgroupManager> {
+    pub fn new(regex_job_id: String, cgroup_root_path: String, cgroup_path_suffix: String, current_sample_period: Arc<Mutex<f32>>, initial_sample_period: f32) -> Arc<CgroupManager> {
         let cgroups = Mutex::new(HashMap::new());
         let cgroup_path = format!("{}/cpuset{}", cgroup_root_path.clone(), cgroup_path_suffix.clone());
         let res = Arc::new(CgroupManager { cgroup_root_path, cgroup_path_suffix, cgroups, regex_job_id,

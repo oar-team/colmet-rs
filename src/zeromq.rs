@@ -9,23 +9,21 @@ extern crate rustc_serialize;
 use serde::{Deserialize, Serialize};
 use rmps::{Deserializer, Serializer};
 use self::zmq::Message;
-use std::sync::{Arc, Mutex};
-use crate::backends::Backend;
 use crate::backends::metric::MetricValues;
 
-pub struct ZmqSender<'a> {
+pub struct ZmqSender {
     sender: zmq::Socket, // sends counters to colmet-collector
     receiver: zmq::Socket, // receives user configuration
-    backends: &'a Vec<Box<dyn Backend>>,
+    //backends: &'a Vec<Box<dyn Backend>>,
 }
 
-impl ZmqSender<'_> {
+impl ZmqSender {
 
-    pub fn init(backends: &Vec<Box<dyn Backend>>) -> ZmqSender {
+    pub fn init() -> ZmqSender {
         let context = zmq::Context::new();
         let sender = context.socket(zmq::PUSH).unwrap();
         let receiver = context.socket(zmq::PULL).unwrap();
-        ZmqSender{sender, receiver, backends}
+        ZmqSender{sender, receiver}//, backends}
     }
 
     pub fn open(&self, uri:&str, linger:i32, high_watermark:i32){
@@ -50,26 +48,15 @@ impl ZmqSender<'_> {
     }
 
     // receive message containing a new config for colmet, change sample period and metrics collected by backends (only perfhw at the moment)
-    pub fn receive_config(&self, sample_period: Arc<Mutex<f64>>) {
+    pub fn receive_config(&self) -> Option<HashMap<String,String>> {
         let mut message = Message::new();
         match self.receiver.recv(&mut message, 1) {
-            Err(_e) => (),
+            Err(_e) => { return None;},
             Ok(_t) => {
                 let mut deserializer = Deserializer::new(&message[..]);
-                let config:HashMap<String, String>  = Deserialize::deserialize(&mut deserializer).unwrap();
+                let config:HashMap<String, String> = Deserialize::deserialize(&mut deserializer).unwrap();
                 println!("config {:#?}", config);
-                *(&*sample_period).lock().unwrap() = config["sample_period"].parse().unwrap();
-
-                for backend in self.backends{
-                    if backend.get_backend_name() == "Perfhw"{
-                        let m : Vec<&str> = config["perfhw_metrics"].split(",").collect();
-                        let mut metrics = Vec::new();
-                        for metric in m{
-                            metrics.push(metric.to_string());
-                        }
-                        //backend.set_metrics_to_get(metrics);
-                    }
-                }
+                return Some(config);
             }
         }
     }

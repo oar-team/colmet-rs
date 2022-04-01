@@ -11,47 +11,19 @@ use crate::backends::Backend;
 use crate::cgroup_manager::CgroupManager;
 
 use crate::utils::wait_file;
-use std::cell::RefCell;
-
-use std::rc::Rc;
 
 pub struct CpuBackend {
     pub backend_name: String,
     cgroup_manager: Arc<CgroupManager>,
-    metrics: Rc<RefCell<HashMap<i32, MetricValues>>>,
-    metrics_to_get: Rc<RefCell<Vec<Metric>>>,
 }
 
 impl CpuBackend {
     pub fn new(cgroup_manager: Arc<CgroupManager>) -> CpuBackend {
         // this function is almost the same for all backends but there is no inheritance in rust, use composition ?
         let backend_name = "cpu".to_string();
-
-        let metrics = Rc::new(RefCell::new(HashMap::new()));
-        
-        let metrics_to_get = Rc::new(RefCell::new(Vec::new()));
-
-        for (cgroup_id, cgroup_name) in cgroup_manager.get_cgroups() {
-            let filename:String;
-            if cgroup_manager.cgroup_path_suffix.ne(""){
-                filename=format!("{}/cpu{}/{}/cpu.stat", cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name);
-            }else {
-               filename=format!("{}/cpu/cpu.stat", cgroup_manager.cgroup_root_path); 
-            }
-            let metric_names = get_metric_names(&filename);
-            let metric = MetricValues {
-                job_id: cgroup_id,
-                backend_name: backend_name.clone(),
-                metric_names,
-                metric_values: Vec::new(),
-            };
-            (*metrics).borrow_mut().insert(cgroup_id, metric);
-        }
         CpuBackend {
             backend_name,
             cgroup_manager,
-            metrics,
-            metrics_to_get,
         }
     }
 }
@@ -88,7 +60,6 @@ fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMa
                 );
 
                 wait_file(&filename, true);
-                debug!("metrics: {:#?}", self.metrics);
 
                 let mut metric_values = get_metric_values(&filename, metrics_to_get.get(&cgroup_id).unwrap().clone());
 
@@ -113,26 +84,6 @@ fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMa
     }
 }
 
-
-fn get_metric_names(filename: &String) -> Vec<String> {
-    debug!("openning {}", &filename);
-    let mut file = File::open(filename).unwrap();
-    let mut content = String::new();
-    file.read_to_string(&mut content).unwrap();
-    let lines: Vec<&str> = content.split("\n").collect();
-    let mut res: Vec<String> = Vec::new();
-    for i in 0..lines.len() - 1 {
-        let line = lines[i];
-        let tmp1 = line.to_string();
-        let tmp2: Vec<&str> = tmp1.split(" ").collect();
-        res.push(tmp2[0].to_string());
-    }
-    //    let metric_names = res[..res.len()].to_vec().into_iter();
-    let metric_names = res[..res.len()].to_vec();
-
-    metric_names
-}
-
 fn get_metric_values(filename: &String, metrics_to_get: Vec<Metric>) -> Vec<i64> {
     let mut file = File::open(filename).unwrap();
     let mut content = String::new();
@@ -151,8 +102,5 @@ fn get_metric_values(filename: &String, metrics_to_get: Vec<Metric>) -> Vec<i64>
     for m in metrics_to_get {
         res.push(h.get_mut(&m.metric_name).unwrap().parse::<i64>().unwrap());
     }
-    // why did he do this ???
-    //let metric_values = res[..res.len()].to_vec();
-    //metric_values
     res
 }

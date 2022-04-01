@@ -5,9 +5,11 @@ about: Collect cpu, memory and i/o statistics about processes in a cgroup.
 args:
     - metrics:
         short: m
+        long: metrics
         default_value: ''
-    - metrics_file:
+    - file_metrics:
         short: f
+        long: file_metrics
         help: sets metrics to collect and their sampling rate
         default_value: ''
     - verbose:

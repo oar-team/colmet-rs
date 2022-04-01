@@ -57,12 +57,12 @@ lazy_static! {
 }
 
 // replace metric names by their id
-pub fn compress_metric_names(metric_names: Vec<String>) -> Vec<i32> {
+pub fn compress_metric_names(metric_names: Vec<String>) -> Vec<String> {
     debug!("compress_metric_names");
-    let mut res: Vec<i32> = Vec::new();
+    let mut res: Vec<String> = Vec::new();
     for metric_name in metric_names {
         // debug!("compress_metric_names metric_name {:#?}", metric_name.as_str().clone());
-        res.push(METRIC_NAMES_MAP.get(metric_name.as_str()).unwrap().0);
+        res.push(format!("{}", METRIC_NAMES_MAP.get(metric_name.as_str()).unwrap().0));
     }
     res
 }
@@ -74,7 +74,7 @@ pub trait Backend {
 }
 
 pub struct BackendsManager {
-    backends: Rc<RefCell<Vec<Box<dyn Backend>>>>,
+    backends: Rc<RefCell<Vec<Box<dyn Backend>>>>, //need Rc<RefCell<>> because we are borrowing it in local functions + ref
     pub metrics_to_get: Vec<Metric>,
     pub last_timestamp: i64,
     pub sample_period: i64,
@@ -83,7 +83,7 @@ pub struct BackendsManager {
 }
 
 impl BackendsManager {
-    pub fn new(sp: f64, metrics: Vec<Metric>) -> BackendsManager {
+    pub fn new(sp: f32, metrics: Vec<Metric>) -> BackendsManager {
         let backends = Rc::new(RefCell::new(Vec::new()));
         let mut metrics_to_get:Vec<Metric>=Vec::new();
         for m in metrics.clone() {
@@ -99,12 +99,11 @@ impl BackendsManager {
         BackendsManager { backends, metrics_to_get, last_timestamp, last_measurement, metrics_modified, sample_period }
     }
 
-    pub fn init_backends(& self, cli_args: CliArgs, cgroup_manager : Arc<CgroupManager>) ->  Rc<RefCell<Vec<Box<dyn Backend>>>> {
+    pub fn init_backends(& self, cli_args: CliArgs, cgroup_manager : Arc<CgroupManager>){
         let memory_backend = MemoryBackend::new(cgroup_manager.clone());
         let cpu_backend = CpuBackend::new(cgroup_manager.clone());
         self.add_backend(Box::new(memory_backend));
         self.add_backend(Box::new(cpu_backend));
-
 
         if cli_args.enable_infiniband {
             ()
@@ -119,7 +118,6 @@ impl BackendsManager {
             let perfhw_backend = PerfhwBackend::new(cgroup_manager.clone());
             self.add_backend(Box::new(perfhw_backend));
         }
-        return self.backends.clone();
     }
 
     pub fn add_backend(& self, backend: Box<dyn Backend>) {
@@ -127,14 +125,14 @@ impl BackendsManager {
     }
 
 
-// returns a HashMap
 // job_id -> (hostname, timestamp, version, vec of MetricValues)
     pub fn make_measure(&mut self, timestamp: i64, hostname: String) -> bool {
         let version = *METRICS_VERSION;
-        if self.metrics_modified {
+        if self.metrics_modified { // reset measurement if new metrics
             self.last_measurement = HashMap::new();
+            self.metrics_modified=false;
         }
-        if self.last_timestamp==0 {
+        if self.last_timestamp==0 { //first exec of the loop
             self.last_timestamp=timestamp;
         }
         for m in self.metrics_to_get.clone() {
@@ -147,16 +145,17 @@ impl BackendsManager {
             return false;
         }
         debug!("list of metrics to get now (delta_t :{}) {:?}\n", delta_t, list_metrics);
-        let b = (*self.backends).borrow();
-        let bi = b.iter();
-        for backend in bi {
+        let cp_b=(*self.backends).borrow();
+        let b_iter=cp_b.iter();
+        for backend in b_iter{
             //debug!("backend {}", backend.get_backend_name());
             if list_metrics.get_mut(&(backend.get_backend_name())).is_none(){
                 continue;
             }
             //debug!("metrics to get for backend {} :\n {:?}", backend.get_backend_name(),  list_metrics.get(&(backend.get_backend_name())).unwrap());
-            for (job_id, metric) in backend.return_values(list_metrics.get_mut(&(backend.get_backend_name())).unwrap().clone()) {
+            for (job_id,mut metric) in backend.return_values(list_metrics.get_mut(&(backend.get_backend_name())).unwrap().clone()) {
                 //debug!("metric values : {} {:?}", job_id, metric);
+                metric.metric_names=compress_metric_names(metric.metric_names);
                 match self.last_measurement.get(&job_id) {
                     // if some metrics have already been added for the same job_id
                     Some(tmp) => {
@@ -214,5 +213,13 @@ impl BackendsManager {
                   measure.metric_values=metrics[i].metric_values.clone();
               }
         }
+    }
+    pub fn update_metrics_to_get(&mut self, n_period:f32, n_metrics:Vec<Metric>){
+    self.sample_period=(n_period*1000.)as i64;
+    self.metrics_to_get.clear();
+    for met in n_metrics{
+        self.metrics_to_get.push(met);
+    }
+    self.metrics_modified=true;
     }
 }
