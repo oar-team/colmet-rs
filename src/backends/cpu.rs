@@ -32,10 +32,12 @@ impl CpuBackend {
         let metrics_to_get = Rc::new(RefCell::new(Vec::new()));
 
         for (cgroup_id, cgroup_name) in cgroup_manager.get_cgroups() {
-            let filename = format!(
-                "{}/cpu{}/{}/cpu.stat",
-                cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name
-            );
+            let filename:String;
+            if cgroup_manager.cgroup_path_suffix.ne(""){
+                filename=format!("{}/cpu{}/{}/cpu.stat", cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name);
+            }else {
+               filename=format!("{}/cpu/cpu.stat", cgroup_manager.cgroup_root_path); 
+            }
             let metric_names = get_metric_names(&filename);
             let metric = MetricValues {
                 job_id: cgroup_id,

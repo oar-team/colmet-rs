@@ -58,10 +58,10 @@ lazy_static! {
 
 // replace metric names by their id
 pub fn compress_metric_names(metric_names: Vec<String>) -> Vec<i32> {
-    println!("compress_metric_names");
+    debug!("compress_metric_names");
     let mut res: Vec<i32> = Vec::new();
     for metric_name in metric_names {
-        // println!("compress_metric_names metric_name {:#?}", metric_name.as_str().clone());
+        // debug!("compress_metric_names metric_name {:#?}", metric_name.as_str().clone());
         res.push(METRIC_NAMES_MAP.get(metric_name.as_str()).unwrap().0);
     }
     res
@@ -91,7 +91,7 @@ impl BackendsManager {
             met.backend_name=METRIC_NAMES_MAP.get(&m.metric_name).unwrap().1.clone();
             metrics_to_get.push(met);
         }
-        //println!("{:?}", metrics_to_get);
+        //debug!("{:?}", metrics_to_get);
         let last_measurement : HashMap<i32, (String, i64, i64, Vec<MetricValues>)>=HashMap::new();
         let last_timestamp=0 as i64;
         let metrics_modified=false;
@@ -129,7 +129,7 @@ impl BackendsManager {
 
 // returns a HashMap
 // job_id -> (hostname, timestamp, version, vec of MetricValues)
-    pub fn make_measure(&mut self, timestamp: i64, hostname: String) {
+    pub fn make_measure(&mut self, timestamp: i64, hostname: String) -> bool {
         let version = *METRICS_VERSION;
         if self.metrics_modified {
             self.last_measurement = HashMap::new();
@@ -138,22 +138,25 @@ impl BackendsManager {
             self.last_timestamp=timestamp;
         }
         for m in self.metrics_to_get.clone() {
-            println!("{} {:?}", m.metric_name, m.time_remaining_before_next_measure);
+            debug!("{} {:?}", m.metric_name, m.time_remaining_before_next_measure);
         }
         let delta_t=timestamp-self.last_timestamp;
         self.last_timestamp=timestamp;
         let mut list_metrics=self.get_metrics_to_collect_now(delta_t);
-        println!("list of metrics to get now (delta_t :{}) {:?}\n", delta_t, list_metrics);
+        if list_metrics.len()==0{
+            return false;
+        }
+        debug!("list of metrics to get now (delta_t :{}) {:?}\n", delta_t, list_metrics);
         let b = (*self.backends).borrow();
         let bi = b.iter();
         for backend in bi {
-            //println!("backend {}", backend.get_backend_name());
+            //debug!("backend {}", backend.get_backend_name());
             if list_metrics.get_mut(&(backend.get_backend_name())).is_none(){
                 continue;
             }
-            //println!("metrics to get for backend {} :\n {:?}", backend.get_backend_name(),  list_metrics.get(&(backend.get_backend_name())).unwrap());
+            //debug!("metrics to get for backend {} :\n {:?}", backend.get_backend_name(),  list_metrics.get(&(backend.get_backend_name())).unwrap());
             for (job_id, metric) in backend.return_values(list_metrics.get_mut(&(backend.get_backend_name())).unwrap().clone()) {
-                //println!("metric values : {} {:?}", job_id, metric);
+                //debug!("metric values : {} {:?}", job_id, metric);
                 match self.last_measurement.get(&job_id) {
                     // if some metrics have already been added for the same job_id
                     Some(tmp) => {
@@ -169,6 +172,7 @@ impl BackendsManager {
                 }
             }
         }
+        return true;
     }
     pub fn sort_waiting_metrics(&mut self){
         self.metrics_to_get.sort_by_key(| k | k.time_remaining_before_next_measure);
@@ -176,7 +180,7 @@ impl BackendsManager {
 
     pub fn get_sleep_time(&mut self) -> u128 {
        self.sort_waiting_metrics();
-       println!("shortest time remaining : {}", (self.metrics_to_get[0].clone().time_remaining_before_next_measure*1000000 ) as u128 );
+       debug!("shortest time remaining : {}", (self.metrics_to_get[0].clone().time_remaining_before_next_measure*1000000 ) as u128 );
        (self.metrics_to_get[0].clone().time_remaining_before_next_measure * 1000000) as u128
     }
 

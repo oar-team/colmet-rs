@@ -30,10 +30,12 @@ impl MemoryBackend {
 
         for (cgroup_id, cgroup_name) in cgroups {
             debug!("{} : {}", cgroup_id, cgroup_name);
-            let filename = format!(
-                "{}/memory{}/{}/memory.stat",
-                cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name
-            );
+            let filename:String;
+            if cgroup_manager.cgroup_path_suffix.ne(""){
+                filename=format!("{}/memory{}/{}/memory.stat", cgroup_manager.cgroup_root_path, cgroup_manager.cgroup_path_suffix, cgroup_name);
+            }else {
+               filename=format!("{}/memory/memory.stat", cgroup_manager.cgroup_root_path); 
+            }
             wait_file(&filename, true);
 
             let metric_names = get_metric_names(filename);

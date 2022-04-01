@@ -36,6 +36,8 @@ mod zeromq;
 
 fn main(){
 
+    let mut measure_done:bool;
+
     let cli_args = parse_cli_args();
 
     let sample_period = Arc::new(Mutex::new(cli_args.sample_period));
@@ -75,29 +77,34 @@ fn main(){
     let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
     
     // main loop that pull backends measurements periodically ans send them with zeromq
-    for i in 1..10 {
+    for _ in 1..20 {
         let now = SystemTime::now();
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
         println!("{:#?}", timestamp);
 
         //maybe compression needed here
-        backend_manager.make_measure(timestamp, hostname.clone());
-        debug!("time to take measures {} microseconds", now.elapsed().unwrap().as_micros());
-        let m = backend_manager.last_measurement.clone();
-        println!("{:?}", m);
-        zmq_sender.send_metrics(m);
+        measure_done=backend_manager.make_measure(timestamp, hostname.clone());
+        
+        let time_to_take_measure=now.elapsed().unwrap().as_nanos();
+        debug!("time to take measures {} microseconds", time_to_take_measure/1000);
+        if measure_done {
+            let m = backend_manager.last_measurement.clone();
+            debug!("{:?}", m);
+            zmq_sender.send_metrics(m);
+        }
         //zmq_sender.receive_config(sample_period.clone());
         sleep_to_round_timestamp(backend_manager.get_sleep_time());
-
     }
 }
 
 /// sleep until the next timestamp that is a multiple of given duration_nanoseconds
 /// as a consequence, the function sleeps a duration that is almost duration_nanoseconds and ends on a round timestamp
+/// Round timestamp = millisecond granularity ?
+/// to compensate for the ntp drift ? 
 fn sleep_to_round_timestamp(duration_nanoseconds: u128) {
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos();
     let duration_to_sleep = ((now / duration_nanoseconds) + 1) * duration_nanoseconds - now;
-    println!("sleeping for {:#?} milliseconds", duration_to_sleep/1000000);
+    debug!("sleeping for {:#?} milliseconds", duration_to_sleep/1000000);
     sleep(Duration::from_nanos(duration_to_sleep as u64));
 }
 
@@ -124,7 +131,7 @@ fn parse_cli_args() -> CliArgs {
     let matches = App::from_yaml(yaml).get_matches();
     let verbose = value_t!(matches, "verbose", i32).unwrap();
     let sample_period = value_t!(matches, "sample-period", f64).unwrap();
-    println!("sample period {}", sample_period);
+    debug!("sample period {}", sample_period);
     let enable_infiniband = value_t!(matches, "enable-infiniband", bool).unwrap();
     let enable_lustre = value_t!(matches, "enable-lustre", bool).unwrap();
     let enable_perfhw = value_t!(matches, "enable-perfhw", bool).unwrap();
@@ -153,7 +160,7 @@ fn parse_cli_args() -> CliArgs {
         metrics_to_get.push(Metric{job_id:-1, metric_name: "cache".to_string(), backend_name: "Memory".to_string(), sampling_period: 10., time_remaining_before_next_measure: (10.*1000.0) as i64});
         metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: 1., time_remaining_before_next_measure: (1.*1000.0) as i64});
     }else{
-        println!("{}", arg_metrics);
+        debug!("{}", arg_metrics);
         metrics_to_get=parse_metrics(arg_metrics);
     }
     
