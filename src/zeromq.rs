@@ -51,7 +51,7 @@ impl ZmqSender {
     pub fn receive_config(&self) -> Option<HashMap<String,String>> {
         let mut message = Message::new();
         match self.receiver.recv(&mut message, 1) {
-            Err(_e) => { return None;},
+            Err(e) => { println!("Error {:?}", e); return None;},
             Ok(_t) => {
                 let mut deserializer = Deserializer::new(&message[..]);
                 let config:HashMap<String, String> = Deserialize::deserialize(&mut deserializer).unwrap();
