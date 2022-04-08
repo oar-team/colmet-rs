@@ -75,6 +75,7 @@ fn main(){
                 None => (),
                 Some(new_metrics) => { backend_manager.update_metrics_to_get(sample_period, new_metrics); debug!("New metrics \\o/");  }
             }
+        }
         let now = SystemTime::now();
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
         println!("{:#?}", timestamp);
@@ -83,13 +84,12 @@ fn main(){
         measure_done=backend_manager.make_measure(timestamp, hostname.clone());
         
         let time_to_take_measure=now.elapsed().unwrap().as_nanos();
-        if measure_done {
+        //if measure_done {
             debug!("time to take measures {} microseconds", time_to_take_measure/1000);
             let m = backend_manager.last_measurement.clone();
             debug!("{:?}", m);
             zmq_sender.send_metrics(m);
-        }
-        }
+        //}
         sleep_to_round_timestamp(backend_manager.get_sleep_time());
     }
 }
@@ -159,8 +159,8 @@ fn parse_cli_args() -> CliArgs {
     }
     if arg_metrics.is_empty() {
         //metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache".to_string(), backend_name: "Memory".to_string(), sampling_period: 9., time_remaining_before_next_measure: (10.*1000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: 3., time_remaining_before_next_measure: (2.5*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache".to_string(), backend_name: "Memory".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
     }else{
         match parse_metrics(arg_metrics){
             None => {
