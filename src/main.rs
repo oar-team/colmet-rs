@@ -84,12 +84,14 @@ fn main(){
         measure_done=backend_manager.make_measure(timestamp, hostname.clone());
         
         let time_to_take_measure=now.elapsed().unwrap().as_nanos();
-        //if measure_done {
+        if measure_done {
             debug!("time to take measures {} microseconds", time_to_take_measure/1000);
             let m = backend_manager.last_measurement.clone();
-            debug!("{:?}", m);
+            debug!("collected metrics : {:?}", m);
             zmq_sender.send_metrics(m);
-        //}
+        }else{
+            debug!("Measure not done /o\\");
+        }
         sleep_to_round_timestamp(backend_manager.get_sleep_time());
     }
 }

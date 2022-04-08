@@ -94,7 +94,9 @@ impl BackendsManager {
         for m in metrics.clone() {
             let mut met=m.clone();
             met.backend_name=METRIC_NAMES_MAP.get(&m.metric_name).unwrap().1.clone();
-            met.sampling_period=round_sampling(sample_period, met.sampling_period);
+            if met.sampling_period != -1.{
+                met.sampling_period=round_sampling(sample_period, met.sampling_period);
+            }
             metrics_to_get.push(met);
         }
         debug!("{:?}", metrics_to_get);
@@ -150,13 +152,11 @@ impl BackendsManager {
         let cp_b=(*self.backends).borrow();
         let b_iter=cp_b.iter();
         for backend in b_iter{
-            //debug!("backend {}", backend.get_backend_name());
             if list_metrics.get_mut(&(backend.get_backend_name())).is_none(){
                 continue;
             }
-            //debug!("metrics to get for backend {} :\n {:?}", backend.get_backend_name(),  list_metrics.get(&(backend.get_backend_name())).unwrap());
             for (job_id,mut metric) in backend.return_values(list_metrics.get_mut(&(backend.get_backend_name())).unwrap().clone()) {
-                //debug!("metric values : {} {:?}", job_id, metric);
+                debug!("metric values : {} {:?}", job_id, metric);
                 metric.metric_names=compress_metric_names(metric.metric_names);
                 match self.last_measurement.get(&job_id) {
                     // if some metrics have already been added for the same job_id
