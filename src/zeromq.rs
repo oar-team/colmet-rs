@@ -39,7 +39,7 @@ impl ZmqSender {
     pub fn send_metrics(&self, metrics: HashMap<i32, (String, i64, i64, Vec<MetricValues>)>) {
         let mut buf = Vec::new();
         match metrics.serialize(&mut Serializer::new(&mut buf)){
-            Err(e) => println!("{}", e),
+            Err(e) => debug!("{}", e),
             Ok(_t) => ()
         }
         //        let mut de = Deserializer::new(&buf[..]);
@@ -51,11 +51,11 @@ impl ZmqSender {
     pub fn receive_config(&self) -> Option<HashMap<String,String>> {
         let mut message = Message::new();
         match self.receiver.recv(&mut message, 1) {
-            Err(e) => { println!("Error {:?}", e); return None;},
+            Err(e) => { debug!("Error {:?}", e); return None;},
             Ok(_t) => {
                 let mut deserializer = Deserializer::new(&message[..]);
                 let config:HashMap<String, String> = Deserialize::deserialize(&mut deserializer).unwrap();
-                println!("config {:#?}", config);
+                debug!("config {:#?}", config);
                 return Some(config);
             }
         }

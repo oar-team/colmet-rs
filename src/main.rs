@@ -9,7 +9,6 @@ extern crate serde_derive;
 extern crate simple_logger;
 //extern crate spin_sleep;
 
-use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, SystemTime};
 use std::fs;
@@ -39,8 +38,6 @@ fn main(){
 
     let cli_args = parse_cli_args();
 
-    let sample_period = Arc::new(Mutex::new(cli_args.sample_period));
-    
     init_logger(cli_args.verbose);
     
     if cli_args.verbose>=3 {
@@ -59,8 +56,7 @@ fn main(){
     // TODO, replace cgroup_root_path cgroup_path_suffix by cgroup_cpuset_path ?
     let cgroup_manager = CgroupManager::new(cli_args.regex_job_id.clone(),
                                             cli_args.cgroup_root_path.clone(),
-                                            cli_args.cgroup_path_suffix.clone(),
-                                            sample_period.clone(), cli_args.sample_period);
+                                            cli_args.cgroup_path_suffix.clone(),);
 
 
     backend_manager.init_backends(cli_args.clone(), cgroup_manager.clone());
@@ -77,7 +73,7 @@ fn main(){
             let sample_period:f32=res["sample_period"].clone().parse::<f32>().unwrap();
             match parse_metrics(res["metrics"].clone()){
                 None => (),
-                Some(new_metrics) => { backend_manager.update_metrics_to_get(sample_period, new_metrics); println!("New metrics \\o/");  }
+                Some(new_metrics) => { backend_manager.update_metrics_to_get(sample_period, new_metrics); debug!("New metrics \\o/");  }
             }
         let now = SystemTime::now();
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
@@ -148,7 +144,7 @@ fn parse_cli_args() -> CliArgs {
     let metrics_file = value_t!(matches, "file_metrics", String).unwrap();
     let mut metrics_to_get: Vec<Metric> = Vec::new();
     let mut arg_metrics:String;
-    if !metrics_file.is_empty() { // TODO : fix format of input file (for now only single line is supported)
+    if !metrics_file.is_empty() { 
         if value_t!(matches, "metrics", String).unwrap().len()!=0 { 
         // specifying metrics and the file should fail
             println!("Do not specify metrics manually and a file");
@@ -163,12 +159,13 @@ fn parse_cli_args() -> CliArgs {
     }
     if arg_metrics.is_empty() {
         //metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache".to_string(), backend_name: "Memory".to_string(), sampling_period: 10., time_remaining_before_next_measure: (10.*1000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: 1., time_remaining_before_next_measure: (1.*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "cache".to_string(), backend_name: "Memory".to_string(), sampling_period: 9., time_remaining_before_next_measure: (10.*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: 3., time_remaining_before_next_measure: (2.5*1000.0) as i64});
     }else{
         match parse_metrics(arg_metrics){
             None => {
-                panic!("Could not parse provided metrics");
+                println!("Could not parse provided metrics");
+                //panic!("Could not parse provided metrics");
             }
             Some(m) => {
                 metrics_to_get=m;

@@ -10,6 +10,7 @@ use crate::cgroup_manager::CgroupManager;
 use crate::CliArgs;
 
 use crate::backends::perfhw::PerfhwBackend;
+use crate::utils::round_sampling;
 
 extern crate yaml_rust;
 use yaml_rust::YamlLoader;
@@ -86,16 +87,17 @@ impl BackendsManager {
     pub fn new(sp: f32, metrics: Vec<Metric>) -> BackendsManager {
         let backends = Rc::new(RefCell::new(Vec::new()));
         let mut metrics_to_get:Vec<Metric>=Vec::new();
-        for m in metrics.clone() {
-            let mut met=m.clone();
-            met.backend_name=METRIC_NAMES_MAP.get(&m.metric_name).unwrap().1.clone();
-            metrics_to_get.push(met);
-        }
-        //debug!("{:?}", metrics_to_get);
         let last_measurement : HashMap<i32, (String, i64, i64, Vec<MetricValues>)>=HashMap::new();
         let last_timestamp=0 as i64;
         let metrics_modified=false;
         let sample_period=(sp*1000.)as i64;
+        for m in metrics.clone() {
+            let mut met=m.clone();
+            met.backend_name=METRIC_NAMES_MAP.get(&m.metric_name).unwrap().1.clone();
+            met.sampling_period=round_sampling(sample_period, met.sampling_period);
+            metrics_to_get.push(met);
+        }
+        debug!("{:?}", metrics_to_get);
         BackendsManager { backends, metrics_to_get, last_timestamp, last_measurement, metrics_modified, sample_period }
     }
 
@@ -217,7 +219,8 @@ impl BackendsManager {
     pub fn update_metrics_to_get(&mut self, n_period:f32, n_metrics:Vec<Metric>){
     self.sample_period=(n_period*1000.)as i64;
     self.metrics_to_get.clear();
-    for met in n_metrics{
+    for mut met in n_metrics{
+        met.sampling_period=round_sampling(self.sample_period, met.sampling_period);
         self.metrics_to_get.push(met);
     }
     self.metrics_modified=true;
