@@ -158,19 +158,18 @@ impl BackendsManager {
             for (job_id,mut metric) in backend.return_values(list_metrics.get_mut(&(backend.get_backend_name())).unwrap().clone()) {
                 debug!("metric values : {} {:?}", job_id, metric);
                 metric.metric_names=compress_metric_names(metric.metric_names);
-                match self.last_measurement.get(&job_id) {
+                debug!("before update : {:?}", self.last_measurement);
+                if self.last_measurement.contains_key(&job_id) {
                     // if some metrics have already been added for the same job_id
-                    Some(tmp) => {
-                        let (_hostname, _timestamp, _version, m) = tmp;
-                        self.update_measurement(m.clone(),  metric);
-                    },
-                    // if no metrics were added for the job_id
-                    None => {
-                        let mut v:Vec<MetricValues>=Vec::new();
-                        v.push(metric);
-                        self.last_measurement.insert(job_id, (hostname.clone(), timestamp, version, v.clone()));
-                    },
+                    let tmp=self.last_measurement.remove(&job_id).unwrap();
+                    self.last_measurement.insert(job_id,(tmp.0, tmp.1, tmp.2, self.update_measurement(tmp.3.clone(), metric)));
+                }else{
+                // if no metrics were added for the job_id
+                    let mut v:Vec<MetricValues>=Vec::new();
+                    v.push(metric);
+                    self.last_measurement.insert(job_id, (hostname.clone(), timestamp, version, v.clone()));
                 }
+                debug!("after update : {:?}", self.last_measurement);
             }
         }
         return true;
@@ -207,7 +206,7 @@ impl BackendsManager {
         }
         list_metrics
     }
-    pub fn update_measurement(&self,  m: Vec<MetricValues>,  to_add: MetricValues){
+    pub fn update_measurement(&self,  m: Vec<MetricValues>,  to_add: MetricValues) -> Vec<MetricValues>{
         let mut inserted=false;
         let mut metrics:Vec<MetricValues>=Vec::new();
         for measure in m {
@@ -220,13 +219,17 @@ impl BackendsManager {
                 };
                 metrics.push(metric);
                 inserted=true;
+                debug!("New values");
             }else{
                 metrics.push(measure.clone());
+                debug!("Copying");
             }
         }
         if !inserted{
             metrics.push(to_add.clone());
+            debug!("New metric");
         }
+        metrics
     }
     pub fn update_metrics_to_get(&mut self, n_period:f32, n_metrics:Vec<Metric>){
     self.sample_period=(n_period*1000.)as i64;
