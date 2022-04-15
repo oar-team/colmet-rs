@@ -162,7 +162,7 @@ impl BackendsManager {
                     // if some metrics have already been added for the same job_id
                     Some(tmp) => {
                         let (_hostname, _timestamp, _version, m) = tmp;
-                        self.update_measurement(job_id, m.clone());
+                        self.update_measurement(m.clone(),  metric);
                     },
                     // if no metrics were added for the job_id
                     None => {
@@ -207,13 +207,25 @@ impl BackendsManager {
         }
         list_metrics
     }
-    pub fn update_measurement(&self, job_id: i32, metrics: Vec<MetricValues>){
-        let (_hostname, _timestamp, _version, measures)=self.last_measurement.get(&job_id).unwrap().clone();
-        let i=0;
-        for mut measure in measures {
-              if measure.backend_name==metrics[i].backend_name && measure.metric_names==metrics[i].metric_names {
-                  measure.metric_values=metrics[i].metric_values.clone();
-              }
+    pub fn update_measurement(&self,  m: Vec<MetricValues>,  to_add: MetricValues){
+        let mut inserted=false;
+        let mut metrics:Vec<MetricValues>=Vec::new();
+        for measure in m {
+            if measure.backend_name==to_add.backend_name && measure.metric_names==to_add.metric_names {
+                let metric = MetricValues {
+                    job_id: measure.job_id,
+                    backend_name: measure.backend_name,
+                    metric_names: measure.metric_names,
+                    metric_values: to_add.metric_values.clone(),
+                };
+                metrics.push(metric);
+                inserted=true;
+            }else{
+                metrics.push(measure.clone());
+            }
+        }
+        if !inserted{
+            metrics.push(to_add.clone());
         }
     }
     pub fn update_metrics_to_get(&mut self, n_period:f32, n_metrics:Vec<Metric>){
