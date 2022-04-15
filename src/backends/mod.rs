@@ -158,7 +158,6 @@ impl BackendsManager {
             for (job_id,mut metric) in backend.return_values(list_metrics.get_mut(&(backend.get_backend_name())).unwrap().clone()) {
                 debug!("metric values : {} {:?}", job_id, metric);
                 metric.metric_names=compress_metric_names(metric.metric_names);
-                debug!("before update : {:?}", self.last_measurement);
                 if self.last_measurement.contains_key(&job_id) {
                     // if some metrics have already been added for the same job_id
                     let tmp=self.last_measurement.remove(&job_id).unwrap();
@@ -169,7 +168,6 @@ impl BackendsManager {
                     v.push(metric);
                     self.last_measurement.insert(job_id, (hostname.clone(), timestamp, version, v.clone()));
                 }
-                debug!("after update : {:?}", self.last_measurement);
             }
         }
         return true;
@@ -219,15 +217,12 @@ impl BackendsManager {
                 };
                 metrics.push(metric);
                 inserted=true;
-                debug!("New values");
             }else{
                 metrics.push(measure.clone());
-                debug!("Copying");
             }
         }
         if !inserted{
             metrics.push(to_add.clone());
-            debug!("New metric");
         }
         metrics
     }

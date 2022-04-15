@@ -28,7 +28,6 @@ impl ZmqSender {
 
     pub fn open(&self, uri:&str, linger:i32, high_watermark:i32){
         self.sender.connect(uri).unwrap();
-        println!("{}", uri);
         self.sender.set_linger(linger).unwrap();
         self.sender.set_sndhwm(high_watermark).unwrap();
         self.receiver.bind("tcp://0.0.0.0:5557").unwrap();
