@@ -1,0 +1,5 @@
+cache_misses:10.:-1
+page_faults:-1:-1
+cpu_migrations:-1:-1
+dirty:1.:-1
+nr_periods:2.5:-1
