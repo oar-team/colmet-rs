@@ -10,5 +10,3 @@ echo $$ | sudo-g5k tee -a /dev/oar_cgroups_links/perf_event$OAR_CPUSET/tasks
 sudo-g5k apt install libzmq3-dev -y > /dev/null 2> /dev/null
 
 cargo build
-
-./launch_script.sh

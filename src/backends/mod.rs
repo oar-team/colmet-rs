@@ -122,6 +122,7 @@ impl BackendsManager {
             let perfhw_backend = PerfhwBackend::new(cgroup_manager.clone());
             self.add_backend(Box::new(perfhw_backend));
         }
+        debug!("Number of backend enabled : {}", (*self.backends).borrow().len());
     }
 
     pub fn add_backend(& self, backend: Box<dyn Backend>) {

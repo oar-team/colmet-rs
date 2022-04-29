@@ -96,7 +96,6 @@ fn get_metric_values(filename: &String, metrics_to_get: Vec<Metric>) -> Vec<i64>
     for i in 0..lines.len() - 1 {
         let line = lines[i];
         let tmp1 = line.to_string();
-        println!("line ram : {:?}", tmp1);
         let tmp2: Vec<&str> = tmp1.split(" ").collect();
         h.insert(tmp2[0].to_string(), tmp2[1].to_string());
     }

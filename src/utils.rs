@@ -51,7 +51,7 @@ pub fn wait_file(filename: &String, wait: bool) {
 }
 
 pub fn round_sampling(default_period: i64, met_period:f32) -> f32{
-    let metric_period=met_period as i64;
+    let metric_period=(met_period*1000.) as i64;
     let res:i64;
 
     if metric_period > default_period {
