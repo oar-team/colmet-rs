@@ -78,7 +78,7 @@ fn main(){
         }
         let now = SystemTime::now();
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
-        println!("{:#?}", timestamp);
+        //println!("{:#?}", timestamp);
 
         //maybe compression needed here
         measure_done=backend_manager.make_measure(timestamp, hostname.clone());

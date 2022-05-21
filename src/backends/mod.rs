@@ -231,7 +231,9 @@ impl BackendsManager {
     self.sample_period=(n_period*1000.)as i64;
     self.metrics_to_get.clear();
     for mut met in n_metrics{
-        met.sampling_period=round_sampling(self.sample_period, met.sampling_period);
+        if met.sampling_period != -1. {
+            met.sampling_period=round_sampling(self.sample_period, met.sampling_period);
+        }
         self.metrics_to_get.push(met);
     }
     self.metrics_modified=true;
