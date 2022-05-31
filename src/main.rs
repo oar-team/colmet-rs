@@ -160,9 +160,9 @@ fn parse_cli_args() -> CliArgs {
         arg_metrics = value_t!(matches, "metrics", String).unwrap();
     }
     if arg_metrics.is_empty() {
-        //metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "pgfault".to_string(), backend_name: "Memory".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
+        //metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "pgfault".to_string(), backend_name: "Memory".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000000.0) as i64});
     }else{
         match parse_metrics(arg_metrics){
             None => {
@@ -220,7 +220,7 @@ fn parse_metrics(arg_string: String) -> Option<Vec<Metric>> {
         let met = Metric {
             job_id: j,
             sampling_period: s,
-            time_remaining_before_next_measure: (s*1000.0)as i64,
+            time_remaining_before_next_measure: (s*1000000.0)as i64,
             metric_name:n,
             backend_name: "null".to_string(),
         };

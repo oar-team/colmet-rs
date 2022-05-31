@@ -90,7 +90,7 @@ impl BackendsManager {
         let last_measurement : HashMap<i32, (String, i64, i64, Vec<MetricValues>)>=HashMap::new();
         let last_timestamp=0 as i64;
         let metrics_modified=false;
-        let sample_period=(sp*1000.)as i64;
+        let sample_period=(sp*1000000.)as i64;
         for m in metrics.clone() {
             let mut met=m.clone();
             met.backend_name=METRIC_NAMES_MAP.get(&m.metric_name).unwrap().1.clone();
@@ -179,8 +179,8 @@ impl BackendsManager {
 
     pub fn get_sleep_time(&mut self) -> u128 {
        self.sort_waiting_metrics();
-       debug!("shortest time remaining : {}", (self.metrics_to_get[0].clone().time_remaining_before_next_measure*1000000 ) as u128 );
-       (self.metrics_to_get[0].clone().time_remaining_before_next_measure * 1000000) as u128
+       debug!("shortest time remaining : {}", (self.metrics_to_get[0].clone().time_remaining_before_next_measure*1000) as u128 );
+       (self.metrics_to_get[0].clone().time_remaining_before_next_measure * 1000) as u128
     }
 
     // returns HashMap<backend_name, HashMap<job_id, Vec<Metric>>>
@@ -200,7 +200,7 @@ impl BackendsManager {
                 }
                 let tmp_job=tmp_back.get_mut(&self.metrics_to_get[i].job_id).unwrap();
                 tmp_job.push(self.metrics_to_get[i].clone());
-                self.metrics_to_get[i].time_remaining_before_next_measure = if self.metrics_to_get[i].sampling_period == -1. { self.sample_period } else { (self.metrics_to_get[i].sampling_period * 1000.) as i64 };
+                self.metrics_to_get[i].time_remaining_before_next_measure = if self.metrics_to_get[i].sampling_period == -1. { self.sample_period } else { (self.metrics_to_get[i].sampling_period * 1000000.) as i64 };
             }
         }
         list_metrics
@@ -228,7 +228,7 @@ impl BackendsManager {
         metrics
     }
     pub fn update_metrics_to_get(&mut self, n_period:f32, n_metrics:Vec<Metric>){
-    self.sample_period=(n_period*1000.)as i64;
+    self.sample_period=(n_period*1000000.)as i64;
     self.metrics_to_get.clear();
     for mut met in n_metrics{
         if met.sampling_period != -1. {
