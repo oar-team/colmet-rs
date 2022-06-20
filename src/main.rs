@@ -67,7 +67,7 @@ fn main(){
     
     // main loop that pull backends measurements periodically ans send them with zeromq
     //loop {
-    for _ in 0..10000 {
+    for _ in 0..100000 {
         let config=zmq_sender.receive_config();
         if let Some(new_conf) = config {
             let res:Rc<HashMap<String, String>>=Rc::new(new_conf);
