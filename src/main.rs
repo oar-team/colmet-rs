@@ -64,26 +64,32 @@ fn main(){
     zmq_sender.open(&cli_args.zeromq_uri, cli_args.zeromq_linger, cli_args.zeromq_hwm);
 
     let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
+    let max_value_recv_counter = (1./cli_args.sample_period) as i32;
+    let mut counter = 0;
     
     // main loop that pull backends measurements periodically ans send them with zeromq
     //loop {
-    for _ in 0..100000 {
-        let config=zmq_sender.receive_config();
-        if let Some(new_conf) = config {
-            let res:Rc<HashMap<String, String>>=Rc::new(new_conf);
-            let sample_period:f32=res["sample_period"].clone().parse::<f32>().unwrap();
-            match parse_metrics(res["metrics"].clone()){
-                None => (),
-                Some(new_metrics) => { backend_manager.update_metrics_to_get(sample_period, new_metrics); debug!("New metrics \\o/");  }
-            }
-        }
+    for _ in 0..10000 {
         let now = SystemTime::now();
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
-        //println!("{:#?}", timestamp);
-
         //maybe compression needed here
         measure_done=backend_manager.make_measure(timestamp, hostname.clone());
         
+        if counter == max_value_recv_counter {
+            let config=zmq_sender.receive_config();
+            if let Some(new_conf) = config {
+                let res:Rc<HashMap<String, String>>=Rc::new(new_conf);
+                let sample_period:f32=res["sample_period"].clone().parse::<f32>().unwrap();
+                match parse_metrics(res["metrics"].clone()){
+                    None => (),
+                    Some(new_metrics) => { backend_manager.update_metrics_to_get(sample_period, new_metrics); debug!("New metrics \\o/");  }
+                }
+            }
+            counter=0;
+        } else {
+            counter += 1;
+        }
+
         let time_to_take_measure=now.elapsed().unwrap().as_nanos();
         if measure_done {
             debug!("time to take measures {} microseconds", time_to_take_measure/1000);

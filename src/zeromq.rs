@@ -48,17 +48,15 @@ impl ZmqSender {
 
     // receive message containing a new config for colmet, change sample period and metrics collected by backends (only perfhw at the moment)
     pub fn receive_config(&self) -> Option<HashMap<String,String>> {
-        let mut msg = zmq::Message::new();
-        let mut item=[self.receiver.as_poll_item(zmq::POLLIN)];
-        zmq::poll(&mut item, 0).unwrap();
-        if item[0].is_readable() && self.receiver.recv(&mut msg, 0).is_ok() {
-            let mut deserializer = Deserializer::new(&msg[..]);
-            let config:HashMap<String, String> = Deserialize::deserialize(&mut deserializer).unwrap();
-            debug!("config {:#?}", config);
-            Some(config)
-        }
-        else{
-            None
+        let mut message = zmq::Message::new();
+        match self.receiver.recv(&mut message, zmq::DONTWAIT) {
+            Err(e) => { debug!("Error {:?}", e); None},
+            Ok(_t) => {
+                let mut deserializer = Deserializer::new(&message[..]);
+                let config:HashMap<String, String> = Deserialize::deserialize(&mut deserializer).unwrap();
+                debug!("config {:#?}", config);
+                Some(config)
+            }
         }
     }
 }
