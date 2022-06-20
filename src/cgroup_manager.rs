@@ -26,7 +26,7 @@ pub struct CgroupManager {
 impl CgroupManager {
     pub fn new(regex_job_id: String, cgroup_root_path: String, cgroup_path_suffix: String) -> Arc<CgroupManager> {
         let cgroups = Mutex::new(HashMap::new());
-        let cgroup_path = format!("{}/cpuset{}", cgroup_root_path.clone(), cgroup_path_suffix.clone());
+        let cgroup_path = format!("{}/cpuset{}", cgroup_root_path, cgroup_path_suffix);
         let res = Arc::new(CgroupManager { cgroup_root_path, cgroup_path_suffix, cgroups, regex_job_id });
         notify_jobs(Arc::clone(&res), cgroup_path);
         res
@@ -62,7 +62,7 @@ pub fn notify_jobs(cgroup_manager: Arc<CgroupManager>, cgroup_path: String) {
         let path = cgroup.unwrap().path();
         let cgroup_name = path.file_name().unwrap().to_str().unwrap();
         if let Some(v) = regex_job_id.find(cgroup_name) {
-            cgroup_manager.add_cgroup(*(&cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap()), cgroup_name.to_string())
+            cgroup_manager.add_cgroup(cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap(), cgroup_name.to_string())
         }
     }
 
@@ -98,7 +98,7 @@ pub fn notify_jobs(cgroup_manager: Arc<CgroupManager>, cgroup_path: String) {
                     if let Some(v) = regex_job_id.find(cgroup_name) {
                         debug!("Add cgroup: {}", cgroup_name);
                         cgroup_manager.add_cgroup(
-                            *(&cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap()),
+                            cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap(),
                             cgroup_name.to_string(),
                         )
                     } else {
@@ -109,7 +109,7 @@ pub fn notify_jobs(cgroup_manager: Arc<CgroupManager>, cgroup_path: String) {
                 {
                     if let Some(v) = regex_job_id.find(cgroup_name) {
                         cgroup_manager.remove_cgroup(
-                            *(&cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap()),
+                            cgroup_name[v.start() + 1..v.end()].parse::<i32>().unwrap(),
                         );
                     }
                 }

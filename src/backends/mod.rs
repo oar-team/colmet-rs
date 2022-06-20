@@ -88,10 +88,10 @@ impl BackendsManager {
         let backends = Rc::new(RefCell::new(Vec::new()));
         let mut metrics_to_get:Vec<Metric>=Vec::new();
         let last_measurement : HashMap<i32, (String, i64, i64, Vec<MetricValues>)>=HashMap::new();
-        let last_timestamp=0 as i64;
+        let last_timestamp=0_i64;
         let metrics_modified=false;
         let sample_period=(sp*1000000.)as i64;
-        for m in metrics.clone() {
+        for m in metrics {
             let mut met=m.clone();
             met.backend_name=METRIC_NAMES_MAP.get(&m.metric_name).unwrap().1.clone();
             if met.sampling_period != -1.{
@@ -110,16 +110,13 @@ impl BackendsManager {
         self.add_backend(Box::new(cpu_backend));
 
         if cli_args.enable_infiniband {
-            ()
         }
         if cli_args.enable_lustre {
-            ()
         }
         if cli_args.enable_rapl {
-            ()
         }
         if cli_args.enable_perfhw {
-            let perfhw_backend = PerfhwBackend::new(cgroup_manager.clone());
+            let perfhw_backend = PerfhwBackend::new(cgroup_manager);
             self.add_backend(Box::new(perfhw_backend));
         }
         debug!("Number of backend enabled : {}", (*self.backends).borrow().len());
@@ -146,7 +143,7 @@ impl BackendsManager {
         let delta_t=timestamp-self.last_timestamp;
         self.last_timestamp=timestamp;
         let mut list_metrics=self.get_metrics_to_collect_now(delta_t);
-        if list_metrics.len()==0{
+        if list_metrics.is_empty() {
             return false;
         }
         debug!("list of metrics to get now (delta_t :{}) {:?}\n", delta_t, list_metrics);
@@ -165,13 +162,12 @@ impl BackendsManager {
                     self.last_measurement.insert(job_id,(tmp.0, tmp.1, tmp.2, self.update_measurement(tmp.3.clone(), metric)));
                 }else{
                 // if no metrics were added for the job_id
-                    let mut v:Vec<MetricValues>=Vec::new();
-                    v.push(metric);
+                    let v:Vec<MetricValues>= vec![metric];
                     self.last_measurement.insert(job_id, (hostname.clone(), timestamp, version, v.clone()));
                 }
             }
         }
-        return true;
+        true
     }
     pub fn sort_waiting_metrics(&mut self){
         self.metrics_to_get.sort_by_key(| k | k.time_remaining_before_next_measure);
@@ -223,7 +219,7 @@ impl BackendsManager {
             }
         }
         if !inserted{
-            metrics.push(to_add.clone());
+            metrics.push(to_add);
         }
         metrics
     }

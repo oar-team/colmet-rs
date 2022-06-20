@@ -35,3 +35,4 @@ cmake = "0.1.42"
 
 [profile.release]
 debug=true
+lto=true

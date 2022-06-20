@@ -51,12 +51,12 @@ impl ZmqSender {
     pub fn receive_config(&self) -> Option<HashMap<String,String>> {
         let mut message = Message::new();
         match self.receiver.recv(&mut message, 1) {
-            Err(e) => { debug!("Error {:?}", e); return None;},
+            Err(e) => { debug!("Error {:?}", e); None},
             Ok(_t) => {
                 let mut deserializer = Deserializer::new(&message[..]);
                 let config:HashMap<String, String> = Deserialize::deserialize(&mut deserializer).unwrap();
                 debug!("config {:#?}", config);
-                return Some(config);
+                Some(config)
             }
         }
     }

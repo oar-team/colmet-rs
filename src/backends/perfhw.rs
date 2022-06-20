@@ -31,7 +31,7 @@ impl Backend for PerfhwBackend {
     }
 
     fn get_backend_name(&self) -> String{
-        return self.backend_name.clone();
+        self.backend_name.clone()
     }
 
     fn return_values(&self, mut metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues> {
@@ -59,8 +59,8 @@ impl Backend for PerfhwBackend {
                     metrics_to_get.insert(cgroup_id, v);
                 }
                 for m in metrics_to_get.get(&(-1)).unwrap().clone() {
-                    if metric_names.len()==0 {
-                        metric_names=format!("{}", m.metric_name);
+                    if metric_names.is_empty() {
+                        metric_names=m.metric_name.to_string();
                     }else{
                         metric_names= format!("{},{}",  metric_names , m.metric_name);
                     }
@@ -71,30 +71,25 @@ impl Backend for PerfhwBackend {
 
             metric_names = format!("{}{}", metric_names, "\0");
             debug!("Getting metrics: {}", metric_names);
-            let mut metric_values = get_metric_values(
+            let metric_values = get_metric_values(
                 cgroup_name,
                 metric_names.as_ptr(),
                 metrics_to_get.get(&cgroup_id).unwrap().len(),
             ); // https://doc.rust-lang.org/std/ffi/struct.CString.html this type seems more appropriate but I cant get it to work
-               if ret.contains_key(&cgroup_id) {
-                    ret.get_mut(&cgroup_id).unwrap().metric_values.append(metric_values.as_mut());
-                } else {
-                    let mut m_names: Vec<String>=Vec::new();
-                    for m in metrics_to_get.get_mut(&cgroup_id).unwrap() {
-                        m_names.push(m.metric_name.clone());
-                    }
-                    let metric = MetricValues {
-                        job_id: cgroup_id,
-                        backend_name: self.backend_name.clone(),
-                        metric_names: m_names,
-                        metric_values,
-                    };
-                    ret.insert(cgroup_id, metric);
-                }
+            let mut m_names: Vec<String>=Vec::new();
+            for m in metrics_to_get.get_mut(&cgroup_id).unwrap() {
+                m_names.push(m.metric_name.clone());
+            }
+            let metric = MetricValues {
+                job_id: cgroup_id,
+                backend_name: self.backend_name.clone(),
+                metric_names: m_names,
+                metric_values,
+            };
+            ret.insert(cgroup_id, metric);
         }
         ret
     }
-
 }
 
 fn get_metric_values(cgroup_name: *const u8, metrics_to_get: *const u8, nb_metrics_to_get: usize) -> Vec<i64> {

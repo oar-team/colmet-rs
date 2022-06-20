@@ -45,8 +45,8 @@ fn main(){
     }
     let cgroup_cpuset_path = format!(
         "{}/cpuset{}",
-        cli_args.cgroup_root_path.clone(),
-        cli_args.cgroup_path_suffix.clone()
+        cli_args.cgroup_root_path,
+        cli_args.cgroup_path_suffix
     );
     //let backends_manager_ref = Rc::new(RefCell::new(BackendsManager::new(cli_args.metrics_to_get.clone())));
     let mut backend_manager=BackendsManager::new(cli_args.sample_period, cli_args.metrics_to_get.clone());
@@ -59,17 +59,18 @@ fn main(){
                                             cli_args.cgroup_path_suffix.clone(),);
 
 
-    backend_manager.init_backends(cli_args.clone(), cgroup_manager.clone());
+    backend_manager.init_backends(cli_args.clone(), cgroup_manager);
     let zmq_sender = zeromq::ZmqSender::init();
     zmq_sender.open(&cli_args.zeromq_uri, cli_args.zeromq_linger, cli_args.zeromq_hwm);
 
     let hostname: String = gethostname::gethostname().to_str().unwrap().to_string();
     
     // main loop that pull backends measurements periodically ans send them with zeromq
-    loop {
+    //loop {
+    for _ in 0..10000 {
         let config=zmq_sender.receive_config();
-        if config.is_some(){
-            let res:Rc<HashMap<String, String>>=Rc::new(config.unwrap());
+        if let Some(new_conf) = config {
+            let res:Rc<HashMap<String, String>>=Rc::new(new_conf);
             let sample_period:f32=res["sample_period"].clone().parse::<f32>().unwrap();
             match parse_metrics(res["metrics"].clone()){
                 None => (),
@@ -147,14 +148,14 @@ fn parse_cli_args() -> CliArgs {
     let mut metrics_to_get: Vec<Metric> = Vec::new();
     let mut arg_metrics:String;
     if !metrics_file.is_empty() { 
-        if value_t!(matches, "metrics", String).unwrap().len()!=0 { 
+        if !value_t!(matches, "metrics", String).unwrap().is_empty() { 
         // specifying metrics and the file should fail
             println!("Do not specify metrics manually and a file");
             exit(0);
         }
         arg_metrics=fs::read_to_string(metrics_file)
             .expect("Specified metrics file doesn't exists");
-        arg_metrics=arg_metrics.replace("\n", "");
+        arg_metrics=arg_metrics.replace('\n', "");
     }
     else{
         arg_metrics = value_t!(matches, "metrics", String).unwrap();
@@ -175,7 +176,7 @@ fn parse_cli_args() -> CliArgs {
         }
     }
     
-    let cli_args = CliArgs {
+    CliArgs {
         verbose,
         sample_period,
         enable_infiniband,
@@ -190,23 +191,22 @@ fn parse_cli_args() -> CliArgs {
         wait_cgroup_cpuset_path,
         regex_job_id,
         metrics_to_get
-    };
-    cli_args
+    } 
 }
 
 fn parse_metrics(arg_string: String) -> Option<Vec<Metric>> {
-    let args=arg_string.split(",");
+    let args=arg_string.split(',');
     let mut correct=true;
     let mut metrics = Vec::new();
     let mut s:f32;
     let mut n:String;
     let mut j:i32;
     for arg in args{
-        let v:Vec<&str>=arg.split(":").collect();
+        let v:Vec<&str>=arg.split(':').collect();
         if v.len()==1 {
             n=v[0].to_string();
-            s=-1.;
-            j=-1;
+            s = -1.;
+            j = -1;
         }else if v.len()==3 {
             n=v[0].to_string();
             s=v[1].to_string().parse::<f32>().unwrap();
@@ -227,9 +227,9 @@ fn parse_metrics(arg_string: String) -> Option<Vec<Metric>> {
         metrics.push(met);
     }
     if correct {
-        return Some(metrics);
+        Some(metrics)
     }else{
-        return None;
+        None
     }
 }
 

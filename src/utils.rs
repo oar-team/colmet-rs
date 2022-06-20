@@ -11,7 +11,7 @@ pub fn wait_file(filename: &String, wait: bool) {
             std::process::exit(1);
         } else {
             let mut inotify = Inotify::init().expect("Failed to initialize inotify");
-            let split_path = filename.split("/");
+            let split_path = filename.split('/');
             let mut path = PathBuf::from("/");
             let mut flag = false;
 
