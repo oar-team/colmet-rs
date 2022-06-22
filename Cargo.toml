@@ -34,5 +34,8 @@ libc = "0.2.62"
 cmake = "0.1.42"
 
 [profile.release]
-debug=true
+debug=1
 lto=true
+
+[features]
+dhat-heap = []

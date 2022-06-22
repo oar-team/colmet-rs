@@ -31,9 +31,7 @@ mod cgroup_manager;
 mod utils;
 mod zeromq;
 
-
 fn main(){
-
     let mut measure_done:bool;
 
     let cli_args = parse_cli_args();
@@ -68,8 +66,8 @@ fn main(){
     let mut counter = 0;
     
     // main loop that pull backends measurements periodically ans send them with zeromq
-    //loop {
-    for _ in 0..10000 {
+    loop {
+    //for _ in 0..1000 {
         let now = SystemTime::now();
         let timestamp = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
         //maybe compression needed here
