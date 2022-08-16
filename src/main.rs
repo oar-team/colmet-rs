@@ -65,7 +65,7 @@ fn main(){
     let max_value_recv_counter = (1./cli_args.sample_period) as i32;
     let mut counter = 0;
     
-    // main loop that pull backends measurements periodically ans send them with zeromq
+    // main loop that pull backends measurements periodically and send them with zeromq
     loop {
     //for _ in 0..1000 {
         let now = SystemTime::now();
@@ -166,8 +166,8 @@ fn parse_cli_args() -> CliArgs {
     }
     if arg_metrics.is_empty() {
         //metrics_to_get.push(Metric{job_id:-1, metric_name: "instructions".to_string(), backend_name: "perfhw".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "pgfault".to_string(), backend_name: "Memory".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000000.0) as i64});
-        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "pgfault".to_string(), backend_name: "Memory".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
+        metrics_to_get.push(Metric{job_id:-1, metric_name: "nr_periods".to_string(), backend_name: "Cpu".to_string(), sampling_period: -1., time_remaining_before_next_measure: (sample_period*1000.0) as i64});
     }else{
         match parse_metrics(arg_metrics){
             None => {

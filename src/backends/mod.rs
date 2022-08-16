@@ -90,7 +90,7 @@ impl BackendsManager {
         let last_measurement : HashMap<i32, (String, i64, i64, Vec<MetricValues>)>=HashMap::new();
         let last_timestamp=0_i64;
         let metrics_modified=false;
-        let sample_period=(sp*1000000.)as i64;
+        let sample_period=(sp*1000.)as i64;
         for m in metrics {
             let mut met=m.clone();
             met.backend_name=METRIC_NAMES_MAP.get(&m.metric_name).unwrap().1.clone();
@@ -137,16 +137,19 @@ impl BackendsManager {
         if self.last_timestamp==0 { //first exec of the loop
             self.last_timestamp=timestamp;
         }
-        for m in self.metrics_to_get.clone() {
+        /*for m in self.metrics_to_get.clone() {
             debug!("{} {:?}", m.metric_name, m.time_remaining_before_next_measure);
-        }
+        }*/
         let delta_t=timestamp-self.last_timestamp;
         self.last_timestamp=timestamp;
         let mut list_metrics=self.get_metrics_to_collect_now(delta_t);
         if list_metrics.is_empty() {
             return false;
         }
-        debug!("list of metrics to get now (delta_t :{}) {:?}\n", delta_t, list_metrics);
+        //debug!("list of metrics to get now (delta_t :{}) {:?}\n", delta_t, list_metrics);
+        for meas in self.last_measurement.values_mut() {
+            meas.1 = timestamp;
+        }
         let cp_b=(*self.backends).borrow();
         let b_iter=cp_b.iter();
         for backend in b_iter{
@@ -175,8 +178,8 @@ impl BackendsManager {
 
     pub fn get_sleep_time(&mut self) -> u128 {
        self.sort_waiting_metrics();
-       debug!("shortest time remaining : {}", (self.metrics_to_get[0].clone().time_remaining_before_next_measure*1000) as u128 );
-       (self.metrics_to_get[0].clone().time_remaining_before_next_measure * 1000) as u128
+       debug!("shortest time remaining : {} millis", (self.metrics_to_get[0].clone().time_remaining_before_next_measure) as u128 );
+       (self.metrics_to_get[0].clone().time_remaining_before_next_measure * 1000000) as u128
     }
 
     // returns HashMap<backend_name, HashMap<job_id, Vec<Metric>>>
@@ -196,7 +199,7 @@ impl BackendsManager {
                 }
                 let tmp_job=tmp_back.get_mut(&self.metrics_to_get[i].job_id).unwrap();
                 tmp_job.push(self.metrics_to_get[i].clone());
-                self.metrics_to_get[i].time_remaining_before_next_measure = if self.metrics_to_get[i].sampling_period == -1. { self.sample_period } else { (self.metrics_to_get[i].sampling_period * 1000000.) as i64 };
+                self.metrics_to_get[i].time_remaining_before_next_measure = if self.metrics_to_get[i].sampling_period == -1. { self.sample_period } else { (self.metrics_to_get[i].sampling_period * 1000.) as i64 };
             }
         }
         list_metrics
