@@ -1,11 +1,20 @@
 name: colmet-node
 version: "0.1"
-about: Collect cpu, memory and i/o statistics about proccesses in a cgroup.
+about: Collect cpu, memory and i/o statistics about processes in a cgroup.
 
 args:
+    - metrics:
+        short: m
+        long: metrics
+        default_value: ''
+    - file_metrics:
+        short: f
+        long: file_metrics
+        help: sets metrics to collect and their sampling rate
+        default_value: ''
     - verbose:
         short: v
-        multiple: true
+        default_value: '0'
         help: Set the level of verbosity
     - sample-period:
         short: s

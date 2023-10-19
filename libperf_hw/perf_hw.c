@@ -123,8 +123,8 @@ static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
   long res = syscall(__NR_perf_event_open, hw_event, pid, cpu, group_fd, flags);
 
   if (res == -1) {
-    fprintf(stdout, "Error opening leader %llx %d\n", hw_event->config, errno);
-    fflush(stdout);
+    //fprintf(stdout, "Error opening leader %llx %d\n", hw_event->config, errno);
+    //fflush(stdout);
   }
   return res;
 }
@@ -153,8 +153,8 @@ counter_t init_counters(char *cgroup_name, int *perf_indexes) {
   {
       return NULL;
   }
-  printf("Gathering infos for: %s\n", filename);
-  fflush(stdout);
+  //printf("Gathering infos for: %s\n", filename);
+  //fflush(stdout);
 
   counter_t g_counter = malloc(sizeof(counter_t));
   g_counter->nbperf = nb_perf;
@@ -226,8 +226,8 @@ int get_counters(long long *values, char *cgroup_name) {
     long long count;
     for (int core=0; core<g_counter->nbcores; core++) {
       if (-1 == read(g_counter->counters[i][core], &count, sizeof(long long))) {
-        printf("Error reading counter values \n");
-        fflush(stdout);
+        //printf("Error reading counter values \n");
+        //fflush(stdout);
         return -1;
       }
       accu += count;
@@ -247,22 +247,22 @@ int get_counters(long long *values, char *cgroup_name) {
 // if the cgroup is already in the list, does nothing
 int init_cgroup(char *cgroup_name, char *metrics) {
 
-    printf("Cgroup name received %s \n", cgroup_name);
-    fflush(stdout);
-    printf("Metrics received : %s \n", metrics);
-    fflush(stdout);
+    //printf("Cgroup name received %s \n", cgroup_name);
+    //fflush(stdout);
+    //printf("Metrics received : %s \n", metrics);
+    //fflush(stdout);
     cgroup_t cgroup = find(cgroup_name);
     if (cgroup != NULL) {
         return 1;
     } else {
         char *metrics_copy = strdup(metrics);
         perf_event_list(metrics_copy, &nb_perf, &perf_indexes);
-	printf("metric_copy : %s \n", metrics_copy);
-	fflush(stdout);
-	printf("nb_perf : %d \n", nb_perf);
-	fflush(stdout);
-	printf("perf_indexes[0] : %d \n", perf_indexes[0]);
-	fflush(stdout);
+	//printf("metric_copy : %s \n", metrics_copy);
+	//fflush(stdout);
+	//printf("nb_perf : %d \n", nb_perf);
+	//fflush(stdout);
+	//printf("perf_indexes[0] : %d \n", perf_indexes[0]);
+	//fflush(stdout);
         free(metrics_copy);
         counter_t g_counter = init_counters(cgroup_name, perf_indexes);
         if (g_counter != NULL) {
@@ -347,19 +347,19 @@ void remove_cgroup(char *cgroup_name) {
    clean_cgroup(current);
 }
 
-//void main(){
-//    char options[] = "page_faults,instructions,cache_node,instructions,instructions";
-//    init_cgroup("/oar/lrocher_1876192", options);
-//    char options2[] = "instructions,page_faults,cache_node";
-//    init_cgroup("/oar/lrocher_2", options2);
-//
-//
-//    long long *counters1 = malloc(sizeof(long long)*3);
-//    long long *counters2 = malloc(sizeof(long long)*3);
-//
-//    get_counters(counters1, "/oar/lrocher_1876192");
-//    get_counters(counters2, "/oar/lrocher_2");
-//
-//    printList();
-//    printf("ok");
-//}
+/*void main(){
+    char options[] = "page_faults,instructions,cache_node,instructions,instructions";
+    init_cgroup("/test1", options);
+    char options2[] = "instructions,page_faults,cache_node";
+    init_cgroup("/test2", options2);
+
+
+    long long *counters1 = malloc(sizeof(long long)*3);
+    long long *counters2 = malloc(sizeof(long long)*3);
+
+    get_counters(counters1, "/test1");
+    get_counters(counters2, "/test2");
+
+    printList();
+    printf("ok");
+}*/

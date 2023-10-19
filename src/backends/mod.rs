@@ -1,14 +1,16 @@
 use std::collections::HashMap;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use crate::backends::memory::MemoryBackend;
 use crate::backends::cpu::CpuBackend;
 
 use crate::backends::metric::Metric;
+use crate::backends::metric::MetricValues;
 use crate::cgroup_manager::CgroupManager;
 use crate::CliArgs;
 
 use crate::backends::perfhw::PerfhwBackend;
+use crate::utils::round_sampling;
 
 extern crate yaml_rust;
 use yaml_rust::YamlLoader;
@@ -33,16 +35,20 @@ fn load_metrics_from_yaml() -> yaml_rust::Yaml {
         .unwrap()
 }
 
-// used to send more little messages on the network, metric names are replaced by an id, this list must be the same in colmet-collector
-lazy_static! { 
-    static ref METRIC_NAMES_MAP: HashMap< String, i32> = {
+// HashMap("metric_name", (id, "backend_name")))
+// used to send shorter messages on the network, metric names are replaced by an id, this list must be the same in colmet-collector
+// also used when adding metrics to get to find which backend can handle the requested metric
+lazy_static! {  
+    static ref METRIC_NAMES_MAP: HashMap<String, (i32, String)> = {
         let mut m = HashMap::new();
         let doc = load_metrics_from_yaml();
         let mut i = 0;
-        for metric in doc["metrics_order"].as_vec().unwrap() {
-            m.insert(metric.as_str().unwrap().to_string(), i);
-            // println!("{:?}: {}", metric.as_str().unwrap(), i);
-            i += 1;
+        for back in doc["metrics_order"].as_hash().unwrap() {
+            let (b, array)=back;
+            for metric in array.as_vec().unwrap() { 
+                m.insert(metric.as_str().unwrap().to_string(), (i, b.as_str().unwrap().to_string()));
+                i += 1;
+            }
         }
         m
     };
@@ -51,87 +57,13 @@ lazy_static! {
 
 }
 
-/* TOREMOVE
-lazy_static! {
-    static ref METRIC_NAMES_MAP: HashMap<&'static str, i32> = vec![
-        ("cache", 1), // Memory Backend
-        ("rss", 2),
-        ("rss_huge", 3),
-        ("shmem", 4),
-        ("mapped_file", 5),
-        ("dirty", 6),
-        ("writeback", 7),
-        ("swap", 65),
-        ("pgpgin", 8),
-        ("pgpgout", 9),
-        ("pgfault", 10),
-        ("pgmajfault", 11),
-        ("inactive_anon", 12),
-        ("active_anon", 13),
-        ("inactive_file", 14),
-        ("active_file", 15),
-        ("unevictable", 16),
-        ("hierarchical_memory_limit", 17),
-        ("hierarchical_memsw_limit", 66),
-        ("total_cache", 18),
-        ("total_rss", 19),
-        ("total_rss_huge", 20),
-        ("total_shmem", 21),
-        ("total_mapped_file", 22),
-        ("total_dirty", 23),
-        ("total_writeback", 24),
-        ("total_swap", 67),
-        ("total_pgpgin", 25),
-        ("total_pgpgout", 26),
-        ("total_pgfault", 27),
-        ("total_pgmajfault", 28),
-        ("total_inactive_anon", 29),
-        ("total_active_anon", 30),
-        ("total_inactive_file", 31),
-        ("total_active_file", 32),
-        ("total_unevictable", 33),
-        ("nr_periods", 34), // Cpu Backend
-        ("nr_throttled", 35),
-        ("throttled_time", 36),
-        ("cpu_cycles", 37), // Perfhw Backend
-        ("instructions", 38),
-        ("cache_references", 39),
-        ("cache_misses", 40),
-        ("branch_instructions", 41),
-        ("branch_misses", 42),
-        ("bus_cycles", 43),
-        ("ref_cpu_cycles", 44),
-        ("cache_l1d", 45),
-        ("cache_ll", 46),
-        ("cache_dtlb", 47),
-        ("cache_itlb", 48),
-        ("cache_bpu", 49),
-        ("cache_node", 50),
-        ("cache_op_read", 51),
-        ("cache_op_prefetch", 52),
-        ("cache_result_access", 53),
-        ("cpu_clock", 54),
-        ("task_clock", 55),
-        ("page_faults", 56),
-        ("context_switches", 57),
-        ("cpu_migrations", 58),
-        ("page_faults_min", 59),
-        ("page_faults_maj", 60),
-        ("alignment_faults", 61),
-        ("emulation_faults", 62),
-        ("dummy", 63),
-        ("bpf_output", 64),
-    ].into_iter().collect();
-}
- */
-
 // replace metric names by their id
-pub fn compress_metric_names(metric_names: Vec<String>) -> Vec<i32> {
-    println!("compress_metric_names");
-    let mut res: Vec<i32> = Vec::new();
+pub fn compress_metric_names(metric_names: Vec<String>) -> Vec<String> {
+    debug!("compress_metric_names");
+    let mut res: Vec<String> = Vec::new();
     for metric_name in metric_names {
-        // println!("compress_metric_names metric_nzme {:#?}", metric_name.as_str().clone());
-        res.push(*METRIC_NAMES_MAP.get(metric_name.as_str()).unwrap());
+        // debug!("compress_metric_names metric_name {:#?}", metric_name.as_str().clone());
+        res.push(format!("{}", METRIC_NAMES_MAP.get(metric_name.as_str()).unwrap().0));
     }
     res
 }
@@ -139,45 +71,55 @@ pub fn compress_metric_names(metric_names: Vec<String>) -> Vec<i32> {
 pub trait Backend {
     fn say_hello(&self); // for debug
     fn get_backend_name(&self) -> String;
-    fn open(&self);
-    fn close(&self);
-    fn get_metrics(& self) -> HashMap<i32, Metric>;
-    fn set_metrics_to_get(& self, metrics_to_get: Vec<String>);
+    fn return_values(&self, metrics_to_get: HashMap<i32, Vec<Metric>>) -> HashMap<i32, MetricValues>;
 }
 
 pub struct BackendsManager {
-    backends: Rc<RefCell<Vec<Box<dyn Backend>>>>,
+    backends: Rc<RefCell<Vec<Box<dyn Backend>>>>, //need Rc<RefCell<>> because we are borrowing it in local functions + ref
+    pub metrics_to_get: Vec<Metric>,
+    pub last_timestamp: i64,
+    pub sample_period: i64,
+    pub last_measurement: HashMap<i32, (String, i64, i64, Vec<MetricValues>)>,
+    pub metrics_modified: bool,
 }
 
 impl BackendsManager {
-    pub fn new() -> BackendsManager {
+    pub fn new(sp: f32, metrics: Vec<Metric>) -> BackendsManager {
         let backends = Rc::new(RefCell::new(Vec::new()));
-        BackendsManager { backends }
+        let mut metrics_to_get:Vec<Metric>=Vec::new();
+        let last_measurement : HashMap<i32, (String, i64, i64, Vec<MetricValues>)>=HashMap::new();
+        let last_timestamp=0_i64;
+        let metrics_modified=false;
+        let sample_period=(sp*1000.)as i64;
+        for m in metrics {
+            let mut met=m.clone();
+            met.backend_name=METRIC_NAMES_MAP.get(&m.metric_name).unwrap().1.clone();
+            if met.sampling_period != -1.{
+                met.sampling_period=round_sampling(sample_period, met.sampling_period);
+            }
+            metrics_to_get.push(met);
+        }
+        debug!("{:?}", metrics_to_get);
+        BackendsManager { backends, metrics_to_get, last_timestamp, last_measurement, metrics_modified, sample_period }
     }
 
-    pub fn init_backends(& self, cli_args: CliArgs, cgroup_manager : Arc<CgroupManager>) ->  Rc<RefCell<Vec<Box<dyn Backend>>>> {
+    pub fn init_backends(& self, cli_args: CliArgs, cgroup_manager : Arc<CgroupManager>){
         let memory_backend = MemoryBackend::new(cgroup_manager.clone());
         let cpu_backend = CpuBackend::new(cgroup_manager.clone());
-
-        let perfhw_backend = PerfhwBackend::new(cgroup_manager.clone());
-
-        if cli_args.enable_infiniband {
-            ()
-        }
-        if cli_args.enable_lustre {
-            ()
-        }
-        if cli_args.enable_rapl {
-            ()
-        }
-        if cli_args.enable_perfhw {
-            ()
-        }
         self.add_backend(Box::new(memory_backend));
         self.add_backend(Box::new(cpu_backend));
-        self.add_backend(Box::new(perfhw_backend));
 
-        return self.backends.clone();
+        if cli_args.enable_infiniband {
+        }
+        if cli_args.enable_lustre {
+        }
+        if cli_args.enable_rapl {
+        }
+        if cli_args.enable_perfhw {
+            let perfhw_backend = PerfhwBackend::new(cgroup_manager);
+            self.add_backend(Box::new(perfhw_backend));
+        }
+        debug!("Number of backend enabled : {}", (*self.backends).borrow().len());
     }
 
     pub fn add_backend(& self, backend: Box<dyn Backend>) {
@@ -185,27 +127,114 @@ impl BackendsManager {
     }
 
 
-    pub fn get_all_metrics(& self, timestamp: i64, hostname: String) -> HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)> {
+// job_id -> (hostname, timestamp, version, vec of MetricValues)
+    pub fn make_measure(&mut self, timestamp: i64, hostname: String) -> bool {
         let version = *METRICS_VERSION;
-        let mut metrics: HashMap<i32, (String, i64, i64, Vec<(String, Vec<i32>, Vec<i64>)>)>= HashMap::new();
-
-        let b = (*self.backends).borrow();
-        let bi = b.iter();
-        for backend in bi {
-            for (job_id, metric) in backend.get_metrics() {
-                match metrics.get_mut(&job_id) {
-                    Some(tmp) => {
-                        let (_hostname, _timestamp, _version, m) = tmp;
-                        m.push((metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap()));
-                    },
-                    None => {
-                        metrics.insert(job_id, (hostname.clone(), timestamp, version, vec![(metric.backend_name, compress_metric_names(metric.metric_names), metric.metric_values.unwrap() )]));
-                    },
+        if self.metrics_modified { // reset measurement if new metrics
+            self.last_measurement = HashMap::new();
+            self.metrics_modified=false;
+        }
+        if self.last_timestamp==0 { //first exec of the loop
+            self.last_timestamp=timestamp;
+        }
+        /*for m in self.metrics_to_get.clone() {
+            debug!("{} {:?}", m.metric_name, m.time_remaining_before_next_measure);
+        }*/
+        let delta_t=timestamp-self.last_timestamp;
+        self.last_timestamp=timestamp;
+        let mut list_metrics=self.get_metrics_to_collect_now(delta_t);
+        if list_metrics.is_empty() {
+            return false;
+        }
+        //debug!("list of metrics to get now (delta_t :{}) {:?}\n", delta_t, list_metrics);
+        for meas in self.last_measurement.values_mut() {
+            meas.1 = timestamp;
+        }
+        let cp_b=(*self.backends).borrow();
+        let b_iter=cp_b.iter();
+        for backend in b_iter{
+            if list_metrics.get_mut(&(backend.get_backend_name())).is_none(){
+                continue;
+            }
+            for (job_id,mut metric) in backend.return_values(list_metrics.get_mut(&(backend.get_backend_name())).unwrap().clone()) {
+                debug!("metric values : {} {:?}", job_id, metric);
+                metric.metric_names=compress_metric_names(metric.metric_names);
+                if self.last_measurement.contains_key(&job_id) {
+                    // if some metrics have already been added for the same job_id
+                    let tmp=self.last_measurement.remove(&job_id).unwrap();
+                    self.last_measurement.insert(job_id,(tmp.0, tmp.1, tmp.2, self.update_measurement(tmp.3.clone(), metric)));
+                }else{
+                // if no metrics were added for the job_id
+                    let v:Vec<MetricValues>= vec![metric];
+                    self.last_measurement.insert(job_id, (hostname.clone(), timestamp, version, v.clone()));
                 }
             }
         }
-        metrics
+        true
+    }
+    pub fn sort_waiting_metrics(&mut self){
+        self.metrics_to_get.sort_by_key(| k | k.time_remaining_before_next_measure);
     }
 
-}
+    pub fn get_sleep_time(&mut self) -> u128 {
+       self.sort_waiting_metrics();
+       debug!("shortest time remaining : {} millis", (self.metrics_to_get[0].clone().time_remaining_before_next_measure) as u128 );
+       (self.metrics_to_get[0].clone().time_remaining_before_next_measure * 1000000) as u128
+    }
 
+    // returns HashMap<backend_name, HashMap<job_id, Vec<Metric>>>
+    pub fn get_metrics_to_collect_now(&mut self, delta_t: i64) -> HashMap<String, HashMap<i32, Vec<Metric>>>{
+        let mut list_metrics:HashMap<String, HashMap<i32, Vec<Metric>>>=HashMap::new();
+        for i in 0..self.metrics_to_get.len() {
+            self.metrics_to_get[i].time_remaining_before_next_measure-=delta_t;
+            if self.metrics_to_get[i].time_remaining_before_next_measure <= 0 {
+                // add backend
+                if list_metrics.get_mut(&self.metrics_to_get[i].backend_name).is_none() {
+                    list_metrics.insert(self.metrics_to_get[i].backend_name.clone(), HashMap::new());
+                }
+                let tmp_back=list_metrics.get_mut(&self.metrics_to_get[i].backend_name).unwrap();
+                // add job_id
+                if tmp_back.get_mut(&self.metrics_to_get[i].job_id).is_none() {
+                    tmp_back.insert(self.metrics_to_get[i].job_id, Vec::new());
+                }
+                let tmp_job=tmp_back.get_mut(&self.metrics_to_get[i].job_id).unwrap();
+                tmp_job.push(self.metrics_to_get[i].clone());
+                self.metrics_to_get[i].time_remaining_before_next_measure = if self.metrics_to_get[i].sampling_period == -1. { self.sample_period } else { (self.metrics_to_get[i].sampling_period * 1000.) as i64 };
+            }
+        }
+        list_metrics
+    }
+    pub fn update_measurement(&self,  m: Vec<MetricValues>,  to_add: MetricValues) -> Vec<MetricValues>{
+        let mut inserted=false;
+        let mut metrics:Vec<MetricValues>=Vec::new();
+        for measure in m {
+            if measure.backend_name==to_add.backend_name && measure.metric_names==to_add.metric_names {
+                let metric = MetricValues {
+                    job_id: measure.job_id,
+                    backend_name: measure.backend_name,
+                    metric_names: measure.metric_names,
+                    metric_values: to_add.metric_values.clone(),
+                };
+                metrics.push(metric);
+                inserted=true;
+            }else{
+                metrics.push(measure.clone());
+            }
+        }
+        if !inserted{
+            metrics.push(to_add);
+        }
+        metrics
+    }
+    pub fn update_metrics_to_get(&mut self, n_period:f32, n_metrics:Vec<Metric>){
+    self.sample_period=(n_period*1000000.)as i64;
+    self.metrics_to_get.clear();
+    for mut met in n_metrics{
+        if met.sampling_period != -1. {
+            met.sampling_period=round_sampling(self.sample_period, met.sampling_period);
+        }
+        self.metrics_to_get.push(met);
+    }
+    self.metrics_modified=true;
+    }
+}

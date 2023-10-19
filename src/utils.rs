@@ -11,7 +11,7 @@ pub fn wait_file(filename: &String, wait: bool) {
             std::process::exit(1);
         } else {
             let mut inotify = Inotify::init().expect("Failed to initialize inotify");
-            let split_path = filename.split("/");
+            let split_path = filename.split('/');
             let mut path = PathBuf::from("/");
             let mut flag = false;
 
@@ -48,4 +48,36 @@ pub fn wait_file(filename: &String, wait: bool) {
             inotify.close().expect("Failed to close inotify instance");
         }
     }
+}
+
+pub fn round_sampling(default_period: i64, met_period:f32) -> f32{
+    let metric_period=(met_period*1000.) as i64;
+    let res:i64;
+
+    if metric_period > default_period {
+        if metric_period%default_period==0{
+            res=metric_period;
+        }else{
+            let floor=default_period*(metric_period/default_period);
+            let roundup=default_period*((metric_period/default_period)+1);
+            if i64::abs(floor - metric_period) < roundup - metric_period {
+                res=floor;
+            }else{
+                res=roundup;
+            }
+        }
+    }else{
+        if default_period%metric_period==0{
+            res=metric_period;
+        }else{
+            let roundup=default_period/(default_period/metric_period);
+            let floor=default_period/((default_period/metric_period)+1);
+            if i64::abs(floor - metric_period) < roundup - metric_period {
+                res=floor;
+            }else{
+                res=roundup;
+            }
+        }
+    }
+    (res as f32)/1000.
 }

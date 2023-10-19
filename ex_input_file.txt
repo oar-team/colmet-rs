@@ -1,0 +1,3 @@
+swap:10.:-1,
+total_pgfault:2.:-1,
+nr_throttled:7.:-1
